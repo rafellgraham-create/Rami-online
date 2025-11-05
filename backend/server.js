@@ -14,6 +14,8 @@ app.use(express.static(path.join(__dirname, "../frontend")));
 
 let players = {};
 let deck = [];
+let committedMelds = [];
+let discardPile = []; // Track discarded cards
 
 // Fonction pour créer et mélanger le paquet
 function initDeck() {
@@ -41,6 +43,9 @@ io.on("connection", (socket) => {
 
   // Envoyer la main au joueur
   socket.emit("initHand", players[socket.id].hand);
+  
+  // Send current discard pile state
+  socket.emit("discardPileUpdate", discardPile);
 
   // Quand un joueur pioche
   socket.on("drawCard", () => {
@@ -51,12 +56,45 @@ io.on("connection", (socket) => {
     socket.emit("updateHand", players[socket.id].hand);
   });
 
+  // Quand un joueur pioche dans la défausse
+  socket.on("drawFromDiscard", () => {
+    console.log("Le joueur", socket.id, "pioche dans la défausse");
+    if (discardPile.length === 0) {
+      socket.emit('commitFailed', { message: 'La défausse est vide.' });
+      return;
+    }
+    const card = discardPile.pop();
+    players[socket.id].hand.push(card);
+    socket.emit("updateHand", players[socket.id].hand);
+    io.emit("discardPileUpdate", discardPile);
+  });
+
   // Quand un joueur défausse
   socket.on("discardCard", (card) => {
     console.log("Le joueur", socket.id, "défausse", card);
     players[socket.id].hand = players[socket.id].hand.filter(c => c !== card);
+    discardPile.push(card);
     io.emit("playerDiscarded", { player: socket.id, card });
+    io.emit("discardPileUpdate", discardPile);
     socket.emit("updateHand", players[socket.id].hand);
+  });
+
+  // Quand un joueur commit un meld
+  socket.on('commitMeld', ({ meld, targetCard }) => {
+    // basic validation: player owns the cards
+    const hand = players[socket.id].hand;
+    const ownsAll = meld.every(c => hand.includes(c));
+    if (!ownsAll) {
+      socket.emit('commitFailed', { message: 'Vous ne possédez pas toutes les cartes du meld.' });
+      return;
+    }
+    // remove meld cards from player's hand
+    players[socket.id].hand = hand.filter(c => !meld.includes(c));
+    const committed = { player: socket.id, meld, targetCard };
+    committedMelds.push(committed);
+    io.emit('meldCommitted', committed);
+    // update the player hand
+    socket.emit('updateHand', players[socket.id].hand);
   });
 
   socket.on("disconnect", () => {
