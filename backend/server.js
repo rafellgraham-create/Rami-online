@@ -9,7 +9,7 @@ const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// 👉 Servir les fichiers statiques du dossier frontend
+// Servir les fichiers statiques du dossier frontend
 app.use(express.static(path.join(__dirname, "../frontend")));
 
 let players = {};
@@ -68,5 +68,6 @@ io.on("connection", (socket) => {
 // Lancer le serveur
 const PORT = 3000;
 server.listen(PORT, () => {
-  console.log(`✅ Serveur en ligne sur http://localhost:${PORT}`);
+  console.log(`Serveur en ligne sur http://localhost:${PORT}`);
 });
+

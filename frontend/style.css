@@ -6,7 +6,29 @@ body {
 }
 
 #hand {
-  margin: 20px;
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.06);
+  border-radius: 8px;
+  box-shadow: 0 6px 18px rgba(0,0,0,0.4);
+  z-index: 1000;
+  max-width: calc(100% - 40px);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* ensure main content isn't hidden behind the fixed hand */
+body::after {
+  content: "";
+  display: block;
+  height: 100px; /* space for the fixed hand */
 }
 
 .card {
@@ -19,3 +41,65 @@ body {
   cursor: pointer;
   height: 40px;
 }
+
+/* slide-in animation for newly drawn cards */
+.card.enter {
+  animation: slideIn 360ms ease-out;
+}
+
+/* gentle bounce after the card has slid in */
+.card.bounce {
+  animation: bounce 420ms cubic-bezier(.2,.8,.2,1);
+}
+
+@keyframes bounce {
+  0% { transform: translateY(0); }
+  30% { transform: translateY(-8px); }
+  60% { transform: translateY(0); }
+  100% { transform: translateY(0); }
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(24px) scale(0.98);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+}
+
+/* responsive adjustments */
+@media (max-width: 480px) {
+  #hand {
+    gap: 6px;
+    padding: 6px 8px;
+    bottom: 12px;
+  }
+  .card {
+    padding: 6px 8px;
+    height: 32px;
+    font-size: 14px;
+    border-radius: 4px;
+  }
+  #drawBtn {
+    padding: 6px 10px;
+    font-size: 13px;
+  }
+}
+
+#discardPile {
+  margin-top: 20px;
+  color: #fff;
+}
+
+#drawBtn {
+  margin: 12px;
+  padding: 8px 14px;
+  border-radius: 6px;
+  border: none;
+  background: #ffd966;
+  cursor: pointer;
+}
+
