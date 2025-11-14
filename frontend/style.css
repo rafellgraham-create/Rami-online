@@ -289,6 +289,16 @@ body::after {
   background: #da190b;
 }
 
+.control-btn.bot-btn {
+  background: #2196F3;
+  font-size: 13px;
+  padding: 8px 16px;
+}
+
+.control-btn.bot-btn:hover {
+  background: #1976D2;
+}
+
 #turnIndicator {
   font-weight: bold;
   text-shadow: 0 2px 4px rgba(0,0,0,0.3);

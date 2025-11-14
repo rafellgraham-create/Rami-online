@@ -7,10 +7,22 @@ const { kMaxLength } = require("buffer");
 
 const app = express();
 const server = http.createServer(app);
-const io = new Server(server);
+const io = new Server(server, {
+  cors: {
+    origin: process.env.FRONTEND_URL || "*",
+    methods: ["GET", "POST"]
+  },
+  transports: ['polling'], // Force polling mode for Vercel compatibility
+  allowEIO3: true
+});
 
 // Servir les fichiers statiques du dossier frontend
 app.use(express.static(path.join(__dirname, "../frontend")));
+
+// Health check endpoint for Vercel
+app.get('/api/health', (req, res) => {
+  res.json({ status: 'ok', players: Object.keys(players).length });
+});
 
 let players = {};
 let deck = [];
@@ -27,11 +39,29 @@ let gameState = {
 
 // Bot class
 class RamiBot {
-  constructor(id, io) {
+  constructor(id, io, difficulty = 'medium') {
     this.id = id;
     this.hand = [];
     this.io = io;
-    this.thinkTime = 1500; // ms delay to simulate thinking
+    this.difficulty = difficulty; // 'easy', 'medium', 'hard'
+    
+    // Difficulty settings
+    if (difficulty === 'easy') {
+      this.thinkTime = 2000;
+      this.meldProbability = 0.5; // 50% chance to commit melds
+      this.addToMeldProbability = 0.3; // 30% chance to add to existing melds
+      this.smartDiscardProbability = 0.2; // 20% chance to discard strategically
+    } else if (difficulty === 'medium') {
+      this.thinkTime = 1500;
+      this.meldProbability = 0.75;
+      this.addToMeldProbability = 0.6;
+      this.smartDiscardProbability = 0.5;
+    } else { // hard
+      this.thinkTime = 1000;
+      this.meldProbability = 0.95;
+      this.addToMeldProbability = 0.9;
+      this.smartDiscardProbability = 0.85;
+    }
   }
 
   async takeTurn() {
@@ -58,16 +88,20 @@ class RamiBot {
     
     await this.delay(this.thinkTime);
     
-    // Try to add cards to existing melds first
-    const cardsAdded = this.tryAddToExistingMelds();
-    if (cardsAdded) {
-      await this.delay(this.thinkTime);
+    // Try to add cards to existing melds first (based on difficulty)
+    if (Math.random() < this.addToMeldProbability) {
+      const cardsAdded = this.tryAddToExistingMelds();
+      if (cardsAdded) {
+        await this.delay(this.thinkTime * 0.5);
+      }
     }
     
-    // Try to form and commit new melds
-    const meldCommitted = this.tryCommitMeld();
-    if (meldCommitted) {
-      await this.delay(this.thinkTime);
+    // Try to form and commit new melds (based on difficulty)
+    if (Math.random() < this.meldProbability) {
+      const meldCommitted = this.tryCommitMeld();
+      if (meldCommitted) {
+        await this.delay(this.thinkTime * 0.5);
+      }
     }
     
     // Check for win after melds (in case bot melded all cards)
@@ -124,8 +158,42 @@ class RamiBot {
   }
 
   chooseDiscard() {
-    // Simple strategy: discard a random card
+    // Use smart strategy based on difficulty
+    if (Math.random() < this.smartDiscardProbability) {
+      return this.smartDiscard();
+    }
+    // Random discard (fallback or for easy bots)
     return this.hand[Math.floor(Math.random() * this.hand.length)];
+  }
+  
+  smartDiscard() {
+    // Smart discard: prefer cards that don't fit in potential melds
+    const cardScores = this.hand.map(card => {
+      let score = 0;
+      
+      // Check if card can form sets
+      const rank = card === '🃏' ? null : card.slice(0, -1);
+      if (rank) {
+        const sameRank = this.hand.filter(c => c !== '🃏' && c.slice(0, -1) === rank).length;
+        score += sameRank * 2;
+      }
+      
+      // Check if card can form runs
+      const suit = card === '🃏' ? null : card.slice(-1);
+      if (suit) {
+        const sameSuit = this.hand.filter(c => c !== '🃏' && c.slice(-1) === suit).length;
+        score += sameSuit;
+      }
+      
+      // Jokers are valuable, keep them
+      if (card === '🃏') score += 10;
+      
+      return { card, score };
+    });
+    
+    // Sort by score (ascending) and discard lowest value card
+    cardScores.sort((a, b) => a.score - b.score);
+    return cardScores[0].card;
   }
 
   tryCommitMeld() {
@@ -384,19 +452,20 @@ io.on("connection", (socket) => {
   });
 
   // Add bot
-  socket.on("addBot", () => {
+  socket.on("addBot", (difficulty = 'medium') => {
     const botId = `bot_${Date.now()}`;
-    const bot = new RamiBot(botId, io);
+    const difficultyName = difficulty === 'easy' ? 'Facile' : difficulty === 'hard' ? 'Difficile' : 'Moyen';
+    const bot = new RamiBot(botId, io, difficulty);
     bots[botId] = bot;
-    players[botId] = { hand: [], isBot: true };
+    players[botId] = { hand: [], isBot: true, botDifficulty: difficulty, botName: `Bot (${difficultyName})` };
     
     // Deal cards to bot
     if (deck.length < 13) initDeck();
     players[botId].hand = deck.splice(0, 13);
     bot.hand = players[botId].hand;
     
-    io.emit("playerJoined", { id: botId, isBot: true, playerCount: Object.keys(players).length });
-    console.log("Bot ajouté :", botId);
+    io.emit("playerJoined", { id: botId, isBot: true, playerCount: Object.keys(players).length, botDifficulty: difficulty, botName: `Bot (${difficultyName})` });
+    console.log(`Bot ajouté (${difficultyName}):`, botId);
   });
 
   // Start game
@@ -650,7 +719,7 @@ io.on("connection", (socket) => {
 });
 
 // Lancer le serveur
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Serveur en ligne sur http://localhost:${PORT}`);
 });

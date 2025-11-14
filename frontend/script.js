@@ -1,10 +1,17 @@
-const socket = io();
+const socket = io({
+  transports: ['polling'], // Use polling instead of WebSocket for Vercel
+  reconnection: true,
+  reconnectionDelay: 1000,
+  reconnectionAttempts: 5
+});
 
 const handDiv = document.getElementById("hand");
 const drawBtn = document.getElementById("drawBtn");
 const discardDiv = document.getElementById("discardPile");
 const discardPileContainer = document.getElementById("discardPileContainer");
-const addBotBtn = document.getElementById("addBotBtn");
+const addBotEasyBtn = document.getElementById("addBotEasyBtn");
+const addBotMediumBtn = document.getElementById("addBotMediumBtn");
+const addBotHardBtn = document.getElementById("addBotHardBtn");
 const startGameBtn = document.getElementById("startGameBtn");
 const stopGameBtn = document.getElementById("stopGameBtn");
 const turnIndicator = document.getElementById("turnIndicator");
@@ -408,10 +415,21 @@ function showToast(text, type = 'error', ttl = 4000) {
 }
 
 // Bot controls
-if (addBotBtn) {
-  addBotBtn.onclick = () => {
-    socket.emit('addBot');
-    showToast('Bot ajouté!', 'success', 2000);
+if (addBotEasyBtn) {
+  addBotEasyBtn.onclick = () => {
+    socket.emit('addBot', 'easy');
+  };
+}
+
+if (addBotMediumBtn) {
+  addBotMediumBtn.onclick = () => {
+    socket.emit('addBot', 'medium');
+  };
+}
+
+if (addBotHardBtn) {
+  addBotHardBtn.onclick = () => {
+    socket.emit('addBot', 'hard');
   };
 }
 
@@ -433,7 +451,9 @@ if (stopGameBtn) {
 socket.on('gameStarted', ({ playerOrder }) => {
   gameStarted = true;
   if (startGameBtn) startGameBtn.disabled = true;
-  if (addBotBtn) addBotBtn.disabled = true;
+  if (addBotEasyBtn) addBotEasyBtn.style.display = 'none';
+  if (addBotMediumBtn) addBotMediumBtn.style.display = 'none';
+  if (addBotHardBtn) addBotHardBtn.style.display = 'none';
   if (stopGameBtn) stopGameBtn.style.display = 'inline-block';
   showToast('La partie commence!', 'success', 2000);
 });
@@ -441,7 +461,9 @@ socket.on('gameStarted', ({ playerOrder }) => {
 socket.on('gameState', ({ gameStarted: started, currentPlayer }) => {
   gameStarted = started;
   if (started && startGameBtn) startGameBtn.disabled = true;
-  if (started && addBotBtn) addBotBtn.disabled = true;
+  if (started && addBotEasyBtn) addBotEasyBtn.disabled = true;
+  if (started && addBotMediumBtn) addBotMediumBtn.disabled = true;
+  if (started && addBotHardBtn) addBotHardBtn.disabled = true;
 });
 
 socket.on('turnStart', ({ player }) => {
@@ -472,9 +494,9 @@ socket.on('turnStart', ({ player }) => {
   }
 });
 
-socket.on('playerJoined', ({ id, isBot, playerCount }) => {
+socket.on('playerJoined', ({ id, isBot, playerCount, botName }) => {
   if (isBot) {
-    showToast(`Bot ajouté (${playerCount} joueurs)`, 'success', 2000);
+    showToast(`${botName || 'Bot'} ajouté (${playerCount} joueurs)`, 'success', 2000);
   }
 });
 
@@ -504,7 +526,9 @@ socket.on('gameWon', ({ winner, winnerName, isBot }) => {
   
   // Re-enable game controls
   if (startGameBtn) startGameBtn.disabled = false;
-  if (addBotBtn) addBotBtn.disabled = false;
+  if (addBotEasyBtn) addBotEasyBtn.style.display = 'inline-block';
+  if (addBotMediumBtn) addBotMediumBtn.style.display = 'inline-block';
+  if (addBotHardBtn) addBotHardBtn.style.display = 'inline-block';
   if (stopGameBtn) stopGameBtn.style.display = 'none';
   
   // Clear turn indicator
@@ -531,7 +555,9 @@ socket.on('gameStopped', () => {
   
   // Re-enable game controls
   if (startGameBtn) startGameBtn.disabled = false;
-  if (addBotBtn) addBotBtn.disabled = false;
+  if (addBotEasyBtn) addBotEasyBtn.style.display = 'inline-block';
+  if (addBotMediumBtn) addBotMediumBtn.style.display = 'inline-block';
+  if (addBotHardBtn) addBotHardBtn.style.display = 'inline-block';
   if (stopGameBtn) stopGameBtn.style.display = 'none';
   
   // Clear turn indicator
