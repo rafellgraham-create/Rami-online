@@ -72,16 +72,20 @@ body {
   box-shadow: 0 8px 30px rgba(0,0,0,0.35);
   padding: 18px;
   color: #fff;
+  max-height: 500px;
+  overflow: hidden;
 }
 
 .melds-inner {
-  min-height: 96px;
+  min-height: 384px;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 12px;
-  flex-wrap: nowrap;
+  flex-wrap: wrap;
   overflow-x: auto;
+  overflow-y: auto;
+  padding: 8px;
 }
 
 .melds-inner .placeholder {
@@ -122,8 +126,18 @@ body::after {
   background: white;
   color: black;
   border-radius: 5px;
-  cursor: pointer;
+  cursor: grab;
   height: 40px;
+  user-select: none;
+  transition: transform 200ms, box-shadow 200ms, opacity 200ms;
+}
+
+.card:active {
+  cursor: grabbing;
+}
+
+.card.red {
+  color: #d32f2f;
 }
 
 .card.hovered {
@@ -144,13 +158,37 @@ body::after {
   border-radius: 8px;
   padding: 8px 10px;
   min-width: 140px;
+  max-width: 200px;
+  cursor: pointer;
+  transition: all 200ms;
+  flex-shrink: 0;
+}
+
+.meld:hover {
+  background: rgba(255,255,255,0.08);
+  transform: translateY(-2px);
+}
+
+.meld.selected-meld {
+  background: rgba(255,217,102,0.15);
+  outline: 2px solid #ffd966;
+  box-shadow: 0 4px 12px rgba(255,217,102,0.25);
 }
 .meld-owner {
   font-size: 12px;
   color: rgba(255,255,255,0.8);
   margin-bottom: 6px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
-.meld-cards { display: flex; gap: 6px; }
+.meld-cards { 
+  display: flex; 
+  gap: 6px; 
+  flex-wrap: wrap;
+  justify-content: center;
+}
 
 /* slide-in animation for newly drawn cards */
 .card.enter {
@@ -220,6 +258,52 @@ body::after {
   cursor: pointer;
 }
 
+.control-btn {
+  margin: 0 8px;
+  padding: 10px 20px;
+  border-radius: 6px;
+  border: none;
+  background: #4CAF50;
+  color: white;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 600;
+  transition: background 200ms;
+}
+
+.control-btn:hover {
+  background: #45a049;
+}
+
+.control-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.control-btn.stop-btn {
+  background: #f44336;
+}
+
+.control-btn.stop-btn:hover {
+  background: #da190b;
+}
+
+#turnIndicator {
+  font-weight: bold;
+  text-shadow: 0 2px 4px rgba(0,0,0,0.3);
+}
+
+#turnIndicator.my-turn {
+  color: #4CAF50;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
 /* toast notifications */
 #toasts {
   position: fixed;
@@ -239,4 +323,6 @@ body::after {
   max-width: 320px;
 }
 .toast.error { border-left: 4px solid #ff6b6b; }
+.toast.success { border-left: 4px solid #4CAF50; }
+.toast.info { border-left: 4px solid #2196F3; }
 

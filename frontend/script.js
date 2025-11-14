@@ -4,12 +4,19 @@ const handDiv = document.getElementById("hand");
 const drawBtn = document.getElementById("drawBtn");
 const discardDiv = document.getElementById("discardPile");
 const discardPileContainer = document.getElementById("discardPileContainer");
+const addBotBtn = document.getElementById("addBotBtn");
+const startGameBtn = document.getElementById("startGameBtn");
+const stopGameBtn = document.getElementById("stopGameBtn");
+const turnIndicator = document.getElementById("turnIndicator");
 
 // meld state on client
 let currentMeld = [];
 let hoveredCard = null;
 let melds = []; // list of committed melds to render
 let discardPile = []; // track discard pile cards
+let isMyTurn = false;
+let gameStarted = false;
+let customCardOrder = []; // Store custom ordering of cards
 
 const meldsInner = document.querySelector('.melds-inner');
 
@@ -48,12 +55,35 @@ function renderHand(hand) {
   // preserve the draw button inside the hand container
   const drawBtn = document.getElementById("drawBtn");
   handDiv.innerHTML = "";
+  
+  // Sync custom order with actual hand
+  // Remove cards no longer in hand
+  customCardOrder = customCardOrder.filter(card => hand.includes(card));
+  
+  // Add new cards that aren't in custom order yet
   hand.forEach(card => {
+    if (!customCardOrder.includes(card)) {
+      customCardOrder.push(card);
+    }
+  });
+  
+  // Render in custom order
+  customCardOrder.forEach((card, index) => {
     const div = document.createElement("div");
     div.className = "card";
     div.dataset.card = card;
+    div.dataset.index = index;
     div.textContent = card;
+    div.draggable = true;
+    
+    // Add red class for hearts and diamonds
+    const suit = card.slice(-1);
+    if (suit === '♥' || suit === '♦') {
+      div.classList.add('red');
+    }
+    
     div.onclick = () => socket.emit("discardCard", card);
+    
     // mouse handlers to track hovered card
     div.addEventListener('mouseenter', () => {
       hoveredCard = card;
@@ -68,6 +98,13 @@ function renderHand(hand) {
     if (currentMeld.includes(card)) {
       div.classList.add('selected');
     }
+    
+    // Drag and drop handlers
+    div.addEventListener('dragstart', handleDragStart);
+    div.addEventListener('dragover', handleDragOver);
+    div.addEventListener('drop', handleDrop);
+    div.addEventListener('dragend', handleDragEnd);
+    
     handDiv.appendChild(div);
   });
   // re-attach the draw button at the end of the hand
@@ -76,6 +113,76 @@ function renderHand(hand) {
     drawBtn.onclick = () => socket.emit("drawCard");
     handDiv.appendChild(drawBtn);
   }
+}
+
+// Drag and drop variables
+let draggedCard = null;
+
+function handleDragStart(e) {
+  draggedCard = e.target;
+  e.target.style.opacity = '0.4';
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/html', e.target.innerHTML);
+}
+
+function handleDragOver(e) {
+  if (e.preventDefault) {
+    e.preventDefault();
+  }
+  e.dataTransfer.dropEffect = 'move';
+  return false;
+}
+
+function handleDrop(e) {
+  if (e.stopPropagation) {
+    e.stopPropagation();
+  }
+  
+  if (draggedCard !== e.target && e.target.classList.contains('card')) {
+    // Get the card values being reordered
+    const draggedCardValue = draggedCard.dataset.card;
+    const targetCardValue = e.target.dataset.card;
+    
+    // Update customCardOrder array
+    const draggedIndex = customCardOrder.indexOf(draggedCardValue);
+    const targetIndex = customCardOrder.indexOf(targetCardValue);
+    
+    if (draggedIndex !== -1 && targetIndex !== -1) {
+      // Remove from old position
+      customCardOrder.splice(draggedIndex, 1);
+      
+      // Insert at new position
+      const newTargetIndex = customCardOrder.indexOf(targetCardValue);
+      if (draggedIndex < targetIndex) {
+        customCardOrder.splice(newTargetIndex + 1, 0, draggedCardValue);
+      } else {
+        customCardOrder.splice(newTargetIndex, 0, draggedCardValue);
+      }
+    }
+    
+    // Reorder the visual elements
+    const cards = Array.from(handDiv.querySelectorAll('.card'));
+    const draggedDOMIndex = cards.indexOf(draggedCard);
+    const targetDOMIndex = cards.indexOf(e.target);
+    
+    if (draggedDOMIndex < targetDOMIndex) {
+      e.target.parentNode.insertBefore(draggedCard, e.target.nextSibling);
+    } else {
+      e.target.parentNode.insertBefore(draggedCard, e.target);
+    }
+  }
+  
+  return false;
+}
+
+function handleDragEnd(e) {
+  e.target.style.opacity = '1';
+  
+  // Update all cards to remove drag-over styling
+  const cards = handDiv.querySelectorAll('.card');
+  cards.forEach(card => {
+    card.classList.remove('over');
+  });
 }
 
 socket.on("initHand", (hand) => {
@@ -135,6 +242,13 @@ function renderDiscardPile() {
     const cardEl = document.createElement('div');
     cardEl.className = 'card';
     cardEl.textContent = topCard;
+    
+    // Add red class for hearts and diamonds
+    const suit = topCard.slice(-1);
+    if (suit === '♥' || suit === '♦') {
+      cardEl.classList.add('red');
+    }
+    
     discardDiv.appendChild(cardEl);
   }
 }
@@ -170,9 +284,21 @@ function renderMelds() {
     return;
   }
 
-  melds.forEach(m => {
+  melds.forEach((m, index) => {
     const container = document.createElement('div');
     container.className = 'meld';
+    container.dataset.meldIndex = index;
+    
+    // Make meld clickable to select it for adding cards
+    container.onclick = () => {
+      // Remove previous selection
+      document.querySelectorAll('.meld.selected-meld').forEach(el => el.classList.remove('selected-meld'));
+      // Select this meld
+      container.classList.add('selected-meld');
+      window.selectedMeldIndex = index;
+      showToast(`Meld sélectionné. Appuyez sur 'E' pour sélectionner des cartes, puis 'A' pour les ajouter.`, 'info', 3000);
+    };
+    
     const owner = document.createElement('div');
     owner.className = 'meld-owner';
     owner.textContent = m.player === socket.id ? 'Vous' : `Joueur ${m.player}`;
@@ -183,6 +309,13 @@ function renderMelds() {
       const cd = document.createElement('div');
       cd.className = 'card';
       cd.textContent = c;
+      
+      // Add red class for hearts and diamonds
+      const suit = c.slice(-1);
+      if (suit === '♥' || suit === '♦') {
+        cd.classList.add('red');
+      }
+      
       cardsWrap.appendChild(cd);
     });
     container.appendChild(cardsWrap);
@@ -193,14 +326,19 @@ function renderMelds() {
 // Keyboard handlers: 'e' to add hovered card to current meld, 'r' to commit meld
 document.addEventListener('keydown', (ev) => {
   if (ev.key === 'e' || ev.key === 'E') {
-    if (hoveredCard && !currentMeld.includes(hoveredCard)) {
-      currentMeld.push(hoveredCard);
-      // re-render hand to show selection
-      // get last known hand from DOM by reading hand text nodes (simpler: request server to re-send hand?)
-      // We'll just toggle class on matching card elements in DOM
+    if (hoveredCard) {
       const cardEls = Array.from(document.querySelectorAll('#hand .card'));
-      const el = cardEls.find(x => x.textContent === hoveredCard && !x.classList.contains('selected'));
-      if (el) el.classList.add('selected');
+      const el = cardEls.find(x => x.textContent === hoveredCard);
+      
+      if (currentMeld.includes(hoveredCard)) {
+        // Deselect if already selected
+        currentMeld = currentMeld.filter(c => c !== hoveredCard);
+        if (el) el.classList.remove('selected');
+      } else {
+        // Select if not already selected
+        currentMeld.push(hoveredCard);
+        if (el) el.classList.add('selected');
+      }
     }
   }
   if (ev.key === 'r' || ev.key === 'R') {
@@ -215,6 +353,20 @@ document.addEventListener('keydown', (ev) => {
       document.querySelectorAll('#hand .card.selected').forEach(el => el.classList.remove('selected'));
     }
   }
+  // 'a' to add selected cards to a meld (must click on a meld first)
+  if (ev.key === 'a' || ev.key === 'A') {
+    if (currentMeld.length > 0 && window.selectedMeldIndex !== undefined) {
+      socket.emit('addToMeld', { meldIndex: window.selectedMeldIndex, cards: currentMeld.slice() });
+      // clear local selection
+      currentMeld = [];
+      window.selectedMeldIndex = undefined;
+      // remove selected classes
+      document.querySelectorAll('#hand .card.selected').forEach(el => el.classList.remove('selected'));
+      document.querySelectorAll('.meld.selected-meld').forEach(el => el.classList.remove('selected-meld'));
+    } else if (currentMeld.length > 0) {
+      showToast('Sélectionnez d\'abord un meld en cliquant dessus', 'error', 3000);
+    }
+  }
 });
 
 // receive meld broadcasts
@@ -222,6 +374,16 @@ socket.on('meldCommitted', (data) => {
   // data: { player, meld, targetCard }
   melds.push(data);
   renderMelds();
+});
+
+// receive meld update broadcasts
+socket.on('meldUpdated', ({ meldIndex, newMeld, addedBy }) => {
+  if (meldIndex >= 0 && meldIndex < melds.length) {
+    melds[meldIndex].meld = newMeld;
+    renderMelds();
+    const isMe = addedBy === socket.id;
+    showToast(isMe ? 'Cartes ajoutées au meld!' : 'Un joueur a ajouté des cartes au meld', 'success', 2000);
+  }
 });
 
 // handle commit failures from server
@@ -244,3 +406,137 @@ function showToast(text, type = 'error', ttl = 4000) {
     setTimeout(() => el.remove(), 350);
   }, ttl);
 }
+
+// Bot controls
+if (addBotBtn) {
+  addBotBtn.onclick = () => {
+    socket.emit('addBot');
+    showToast('Bot ajouté!', 'success', 2000);
+  };
+}
+
+if (startGameBtn) {
+  startGameBtn.onclick = () => {
+    socket.emit('startGame');
+  };
+}
+
+if (stopGameBtn) {
+  stopGameBtn.onclick = () => {
+    if (confirm('Êtes-vous sûr de vouloir arrêter la partie?')) {
+      socket.emit('stopGame');
+    }
+  };
+}
+
+// Game state listeners
+socket.on('gameStarted', ({ playerOrder }) => {
+  gameStarted = true;
+  if (startGameBtn) startGameBtn.disabled = true;
+  if (addBotBtn) addBotBtn.disabled = true;
+  if (stopGameBtn) stopGameBtn.style.display = 'inline-block';
+  showToast('La partie commence!', 'success', 2000);
+});
+
+socket.on('gameState', ({ gameStarted: started, currentPlayer }) => {
+  gameStarted = started;
+  if (started && startGameBtn) startGameBtn.disabled = true;
+  if (started && addBotBtn) addBotBtn.disabled = true;
+});
+
+socket.on('turnStart', ({ player }) => {
+  isMyTurn = player === socket.id;
+  
+  if (turnIndicator) {
+    if (isMyTurn) {
+      turnIndicator.textContent = "C'est votre tour!";
+      turnIndicator.className = 'my-turn';
+    } else {
+      const isBot = player.startsWith('bot_');
+      turnIndicator.textContent = isBot ? "Tour du Bot..." : `Tour de ${player}`;
+      turnIndicator.className = '';
+    }
+  }
+  
+  // Enable/disable hand interaction
+  if (handDiv) {
+    handDiv.style.opacity = isMyTurn ? '1' : '0.6';
+    const cards = handDiv.querySelectorAll('.card');
+    cards.forEach(card => {
+      card.style.pointerEvents = isMyTurn ? 'auto' : 'none';
+    });
+  }
+  
+  if (drawBtn) {
+    drawBtn.disabled = !isMyTurn;
+  }
+});
+
+socket.on('playerJoined', ({ id, isBot, playerCount }) => {
+  if (isBot) {
+    showToast(`Bot ajouté (${playerCount} joueurs)`, 'success', 2000);
+  }
+});
+
+socket.on('botAction', ({ bot, action, card }) => {
+  const message = card ? `Bot: ${action} ${card}` : `Bot: ${action}`;
+  showToast(message, 'info', 2000);
+});
+
+// Handle game won
+socket.on('gameWon', ({ winner, winnerName, isBot }) => {
+  const isMe = winner === socket.id;
+  const message = isMe ? '🎉 Vous avez gagné! 🎉' : `${winnerName} a gagné!`;
+  const type = isMe ? 'success' : 'info';
+  
+  showToast(message, type, 6000);
+  
+  // Reset UI state
+  gameStarted = false;
+  melds = [];
+  currentMeld = [];
+  window.selectedMeldIndex = undefined;
+  discardPile = [];
+  customCardOrder = [];
+  
+  renderMelds();
+  renderDiscardPile();
+  
+  // Re-enable game controls
+  if (startGameBtn) startGameBtn.disabled = false;
+  if (addBotBtn) addBotBtn.disabled = false;
+  if (stopGameBtn) stopGameBtn.style.display = 'none';
+  
+  // Clear turn indicator
+  if (turnIndicator) {
+    turnIndicator.textContent = message;
+    turnIndicator.className = isMe ? 'my-turn' : '';
+  }
+});
+
+// Handle game stopped
+socket.on('gameStopped', () => {
+  showToast('La partie a été arrêtée', 'info', 3000);
+  
+  // Reset UI state
+  gameStarted = false;
+  melds = [];
+  currentMeld = [];
+  window.selectedMeldIndex = undefined;
+  discardPile = [];
+  customCardOrder = [];
+  
+  renderMelds();
+  renderDiscardPile();
+  
+  // Re-enable game controls
+  if (startGameBtn) startGameBtn.disabled = false;
+  if (addBotBtn) addBotBtn.disabled = false;
+  if (stopGameBtn) stopGameBtn.style.display = 'none';
+  
+  // Clear turn indicator
+  if (turnIndicator) {
+    turnIndicator.textContent = '';
+    turnIndicator.className = '';
+  }
+});
