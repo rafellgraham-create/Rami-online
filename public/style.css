@@ -1,0 +1,330 @@
+body {
+  background: linear-gradient(135deg, #1a472a 0%, #2d5a3d 100%);
+  color: #fff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  margin: 0;
+  padding: 20px;
+  padding-bottom: 140px;
+  min-height: 100vh;
+}
+
+h1 {
+  text-align: center;
+  color: #ffd966;
+  text-shadow: 2px 2px 4px rgba(0,0,0,0.5);
+}
+
+#hand {
+  display: flex;
+  gap: 10px;
+  padding: 15px;
+  background: rgba(0,0,0,0.3);
+  border-radius: 10px;
+  margin: 20px auto;
+  max-width: 80%;
+  overflow-x: auto;
+  min-height: 100px;
+  align-items: center;
+  position: fixed;
+  bottom: 20px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 100;
+}
+
+.card {
+  min-width: 60px;
+  height: 85px;
+  background: white;
+  border: 2px solid #333;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  cursor: pointer;
+  transition: all 0.2s;
+  user-select: none;
+  color: #000;
+  font-weight: bold;
+}
+
+.card.red {
+  color: #e74c3c;
+}
+
+.card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.3);
+}
+
+.card.selected {
+  background: #ffffcc;
+  border-color: #ffd700;
+  transform: translateY(-5px);
+}
+
+.card.hovered {
+  border-color: #4CAF50;
+}
+
+.card.enter {
+  animation: slideIn 0.3s ease-out;
+}
+
+.card.bounce {
+  animation: bounce 0.4s ease-in-out;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-15px); }
+}
+
+#drawBtn {
+  padding: 12px 24px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+#drawBtn:hover:not(:disabled) {
+  background: #45a049;
+  transform: scale(1.05);
+}
+
+#drawBtn:disabled {
+  background: #666;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+#gameArea {
+  display: grid;
+  grid-template-columns: 1fr 3fr 1fr;
+  gap: 20px;
+  max-width: 1400px;
+  margin: 20px auto;
+  padding: 20px;
+}
+
+.pile-container {
+  text-align: center;
+}
+
+.pile-container h3 {
+  color: #ffd966;
+  margin-bottom: 10px;
+}
+
+.pile {
+  min-height: 140px;
+  background: rgba(0,0,0,0.3);
+  border: 2px dashed #666;
+  border-radius: 10px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px;
+}
+
+#discardPile {
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+#discardPile:hover {
+  border-color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.pile-placeholder {
+  color: #999;
+  font-style: italic;
+}
+
+.deck-visual {
+  pointer-events: none;
+}
+
+.card-back {
+  font-size: 80px;
+  color: #3498db;
+}
+
+#melds {
+  background: rgba(0,0,0,0.2);
+  border-radius: 10px;
+  padding: 15px;
+  min-height: 400px;
+}
+
+.melds-inner {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.meld {
+  background: rgba(255,255,255,0.1);
+  border: 2px solid #555;
+  border-radius: 8px;
+  padding: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.meld:hover {
+  border-color: #4CAF50;
+  background: rgba(76, 175, 80, 0.1);
+}
+
+.meld.selected-meld {
+  border-color: #ffd700;
+  background: rgba(255, 215, 0, 0.2);
+}
+
+.meld-owner {
+  color: #ffd966;
+  font-weight: bold;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+
+.meld-cards {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+
+.meld-cards .card {
+  min-width: 50px;
+  height: 70px;
+  font-size: 18px;
+  cursor: default;
+}
+
+.meld-cards .card:hover {
+  transform: none;
+}
+
+#toasts {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.toast {
+  background: #f44336;
+  color: white;
+  padding: 15px 20px;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.3);
+  animation: slideInRight 0.3s ease-out;
+  max-width: 300px;
+}
+
+.toast.success {
+  background: #4CAF50;
+}
+
+.toast.info {
+  background: #2196F3;
+}
+
+@keyframes slideInRight {
+  from {
+    opacity: 0;
+    transform: translateX(100px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.control-btn {
+  padding: 12px 24px;
+  margin: 5px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: bold;
+  transition: all 0.2s;
+}
+
+.control-btn:hover:not(:disabled) {
+  background: #45a049;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.control-btn:disabled {
+  background: #666;
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.bot-btn {
+  background: #2196F3;
+}
+
+.bot-btn:hover:not(:disabled) {
+  background: #1976D2;
+}
+
+.stop-btn {
+  background: #f44336;
+}
+
+.stop-btn:hover {
+  background: #d32f2f;
+}
+
+#turnIndicator {
+  font-weight: bold;
+  padding: 10px;
+  border-radius: 6px;
+  display: inline-block;
+}
+
+#turnIndicator.my-turn {
+  background: rgba(76, 175, 80, 0.3);
+  border: 2px solid #4CAF50;
+  animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.7; }
+}
+
+.placeholder {
+  color: #999;
+  text-align: center;
+  font-style: italic;
+  margin: 20px 0;
+}
