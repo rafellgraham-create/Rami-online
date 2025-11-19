@@ -2,13 +2,6 @@
   "name": "rami-online",
   "version": "1.0.0",
   "main": "server.js",
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "lint": "eslint",
-    "lint:fix": "eslint --fix"
-  },
   "dependencies": {
     "express": "^4.21.2",
     "next": "^16.0.3",
