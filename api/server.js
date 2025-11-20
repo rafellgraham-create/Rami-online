@@ -745,3 +745,4 @@ server.listen(PORT, () => {
   console.log(`Serveur en ligne sur http://localhost:${PORT}`);
 });
 
+module.exports = app;
