@@ -1,70 +1,132 @@
-# Getting Started with Create React App
+# Rami Online - Card Game
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+A multiplayer Rami (Rummy) card game with AI bot opponents.
 
-## Available Scripts
+## Features
 
-In the project directory, you can run:
+- **Multiplayer gameplay** with Socket.io
+- **AI Bot opponents** with 4 difficulty levels (Easy, Medium, Hard, Realist)
+- **Real-time game updates**
+- **Turn-based gameplay**
+- **Meld validation** for sets and runs
 
-### `npm start`
+## Local Development
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+```bash
+# Install dependencies
+npm install
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+# Start the server
+npm start
+```
 
-### `npm test`
+The game will be available at `http://localhost:3000`
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+## Deployment to Vercel
 
-### `npm run build`
+### Important: Socket.io Limitation on Vercel
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+⚠️ **Vercel's serverless functions have limitations with WebSocket connections.** Socket.io requires persistent connections which may not work reliably on Vercel's free tier.
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+### Recommended Deployment Options:
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+1. **Vercel with Polling Mode (Current Setup)**
+   - Uses HTTP long polling instead of WebSockets
+   - Works but has higher latency
+   - Deploy with: `vercel --prod`
 
-### `npm run eject`
+2. **Alternative Platforms (Recommended)**
+   - **Railway.app** - Better for WebSocket apps
+   - **Render.com** - Free tier supports WebSockets
+   - **Heroku** - Classic choice for Node.js apps
+   - **DigitalOcean App Platform**
+   - **Fly.io**
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+### Deploy to Vercel
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+```bash
+# Install Vercel CLI
+npm i -g vercel
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+# Deploy
+vercel --prod
+```
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+### Deploy to Railway (Recommended)
 
-## Learn More
+1. Create account at [railway.app](https://railway.app)
+2. Connect your GitHub repository
+3. Railway will auto-detect and deploy
+4. Your app will have full WebSocket support
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Project Structure
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+```
+wuii/
+├── api/
+│   ├── index.js          # Main entry point for Vercel
+│   ├── server.js         # Express app setup
+│   ├── gameLogic.js      # Game state and bot logic
+│   └── socketHandlers.js # Socket.io event handlers
+├── public/
+│   ├── index.html        # Game interface
+│   ├── script.js         # Client-side logic
+│   └── style.css         # Styling
+├── server.js             # Local development server
+├── vercel.json           # Vercel configuration
+└── package.json
+```
 
-### Code Splitting
+## How to Play
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+1. **Add Bots**: Click the bot buttons to add AI opponents
+2. **Start Game**: Click "Démarrer la partie"
+3. **Your Turn**: 
+   - Draw a card (from deck or discard pile)
+   - Form melds (3+ cards)
+   - Discard a card to end your turn
+4. **Win**: Be the first to discard all your cards!
 
-### Analyzing the Bundle Size
+## Game Rules
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+- **Set**: 3-4 cards of the same rank (e.g., 7♠ 7♥ 7♦)
+- **Run**: 3+ consecutive cards of the same suit (e.g., 5♠ 6♠ 7♠)
+- **Jokers** (🃏) can substitute for any card
 
-### Making a Progressive Web App
+## Keyboard Shortcuts
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+- `E` - Add hovered card to current meld
+- `R` - Commit current meld
+- `A` - Add selected cards to existing meld
 
-### Advanced Configuration
+## Technologies
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+- Node.js + Express
+- Socket.io for real-time communication
+- Vanilla JavaScript (client)
+- HTML5/CSS3
 
-### Deployment
+## Bot Implementation
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Your game already has a sophisticated bot system! Here's what it does:
 
-### `npm run build` fails to minify
+### Bot Difficulty Levels
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+1. **Easy** - Makes random moves, rarely forms melds
+2. **Medium** - Strategically forms melds, some smart discarding
+3. **Hard** - Aggressive meld formation, smart card management
+4. **Realist** - Ultra-fast, nearly perfect play
+
+### Bot Features
+
+- **Smart Drawing**: Evaluates whether to draw from deck or discard pile
+- **Meld Formation**: Automatically detects and forms sets/runs
+- **Strategic Discarding**: Keeps valuable cards, discards low-value ones
+- **Add to Melds**: Can extend existing melds on the table
+- **Human-like Delays**: Thinks before making moves for realism
+
+The bot AI is in `api/gameLogic.js` - feel free to customize the difficulty settings!
+
+## License
+
+MIT

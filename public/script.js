@@ -1,8 +1,9 @@
-const socket = io({
-  transports: ['polling'], // Use polling instead of WebSocket for Vercel
+const socket = io(window.location.origin, {
+  transports: ['polling', 'websocket'], // Try websocket first, fallback to polling
   reconnection: true,
   reconnectionDelay: 1000,
-  reconnectionAttempts: 5
+  reconnectionAttempts: 5,
+  path: '/socket.io/'
 });
 
 const handDiv = document.getElementById("hand");

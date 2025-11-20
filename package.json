@@ -1,15 +1,16 @@
 {
   "name": "rami-online",
   "version": "1.0.0",
-  "main": "server.js",
+  "main": "api/index.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
   "dependencies": {
     "express": "^4.21.2",
-    "next": "^16.0.3",
-    "react": "^19.2.0",
-    "react-dom": "^19.2.0",
     "socket.io": "^4.8.1"
   },
-  "scripts": {
-    "vercel-build": "next build"
+  "engines": {
+    "node": ">=18.x"
   }
 }
