@@ -13,7 +13,11 @@ const {
 } = require('./gameLogic');
 
 // Serve static files from public directory
-app.use(express.static(path.join(__dirname, "../public")));
+const publicPath = path.join(__dirname, "../public");
+app.use(express.static(publicPath, {
+  maxAge: '1d',
+  etag: true
+}));
 
 // Health check endpoint
 app.get('/api/health', (req, res) => {
@@ -42,5 +46,10 @@ const io = new Server(httpServer, {
 // Setup socket handlers
 require('./socketHandlers')(io);
 
-// For Vercel, we need to export the app
+// For Vercel, we need to export a handler
+// Vercel serverless functions expect a handler, but Socket.io needs persistent connections
+// So we export the httpServer which Vercel will use
 module.exports = httpServer;
+
+// Also export as default for compatibility
+module.exports.default = httpServer;

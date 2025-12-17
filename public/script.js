@@ -1,10 +1,40 @@
-const socket = io(window.location.origin, {
-  transports: ['polling', 'websocket'], // Try websocket first, fallback to polling
-  reconnection: true,
-  reconnectionDelay: 1000,
-  reconnectionAttempts: 5,
-  path: '/socket.io/'
-});
+// Initialize socket with error handling
+let socket;
+try {
+  if (typeof io === 'undefined') {
+    console.error('[Error] Socket.io library not loaded!');
+    throw new Error('Socket.io library not found');
+  }
+  
+  socket = io(window.location.origin, {
+    transports: ['polling', 'websocket'], // Try websocket first, fallback to polling
+    reconnection: true,
+    reconnectionDelay: 1000,
+    reconnectionAttempts: 5,
+    path: '/socket.io/'
+  });
+
+  // Debug connection
+  socket.on('connect', () => {
+    console.log('[Socket] Connected:', socket.id);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('[Socket] Disconnected');
+  });
+
+  socket.on('connect_error', (error) => {
+    console.error('[Socket] Connection error:', error);
+  });
+} catch (error) {
+  console.error('[Error] Failed to initialize socket:', error);
+  // Create a dummy socket object to prevent errors
+  socket = {
+    emit: () => console.warn('[Socket] Socket not connected, cannot emit'),
+    on: () => {},
+    connected: false
+  };
+}
 
 const handDiv = document.getElementById("hand");
 const drawBtn = document.getElementById("drawBtn");
@@ -575,4 +605,13 @@ socket.on('gameStopped', () => {
     turnIndicator.textContent = '';
     turnIndicator.className = '';
   }
+});
+
+// Debug: Verify all elements are found
+console.log('[Debug] Elements check:', {
+  handDiv: !!handDiv,
+  drawBtn: !!drawBtn,
+  startGameBtn: !!startGameBtn,
+  socket: !!socket,
+  socketConnected: socket?.connected
 });
