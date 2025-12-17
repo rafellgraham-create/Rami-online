@@ -19,11 +19,8 @@ module.exports = (io) => {
     // Add player
     players[socket.id] = { hand: [], isBot: false };
 
-    // Deal 13 cards
-    if (deck.length < 13) initDeck();
-    players[socket.id].hand = deck.splice(0, 13);
-
-    // Send hand to player
+    // Start with empty hand; cards are dealt when the game starts
+    players[socket.id].hand = [];
     socket.emit("initHand", players[socket.id].hand);
     
     // Send current discard pile state
@@ -47,8 +44,9 @@ module.exports = (io) => {
       players[botId] = { hand: [], isBot: true, botDifficulty: difficulty, botName: `Bot (${difficultyName})` };
       
       // Deal cards to bot
-      if (deck.length < 13) initDeck();
-      players[botId].hand = deck.splice(0, 13);
+      const gameLogic = require('./gameLogic');
+      if (gameLogic.deck.length < 13) gameLogic.initDeck();
+      players[botId].hand = gameLogic.deck.splice(0, 13);
       bot.hand = players[botId].hand;
       
       io.emit("playerJoined", { id: botId, isBot: true, playerCount: Object.keys(players).length, botDifficulty: difficulty, botName: `Bot (${difficultyName})` });
@@ -72,11 +70,13 @@ module.exports = (io) => {
       gameState.turnIndex = 0;
       committedMelds.length = 0;
       discardPile.length = 0;
+      const gameLogic = require('./gameLogic');
+      gameLogic.initDeck();
       
       // Clear all player hands and redistribute
       Object.keys(players).forEach(playerId => {
-        if (deck.length < 13) initDeck();
-        players[playerId].hand = deck.splice(0, 13);
+        if (gameLogic.deck.length < 13) gameLogic.initDeck();
+        players[playerId].hand = gameLogic.deck.splice(0, 13);
         if (players[playerId].isBot) {
           const bot = bots[playerId];
           if (bot) bot.hand = players[playerId].hand;
@@ -101,10 +101,34 @@ module.exports = (io) => {
         return;
       }
       console.log("Le joueur", socket.id, "pioche une carte");
-      if (deck.length === 0) initDeck();
-      const card = deck.pop();
+      // Access deck through the module to ensure we have the latest reference
+      const gameLogic = require('./gameLogic');
+      if (gameLogic.deck.length === 0) {
+        console.warn("Deck vide, réinitialisation...");
+        gameLogic.initDeck();
+      }
+      console.log("Deck avant pioche:", gameLogic.deck.length, "cartes");
+      const card = gameLogic.deck.pop();
+      if (!card) {
+        console.error("ERREUR: Deck vide après pop, réinitialisation d'urgence...");
+        gameLogic.initDeck();
+        const newCard = gameLogic.deck.pop();
+        if (!newCard) {
+          socket.emit('commitFailed', { message: 'Le paquet est vide. La partie est terminée.' });
+          return;
+        }
+        players[socket.id].hand.push(newCard);
+        players[socket.id].hand = players[socket.id].hand.filter(c => c !== undefined && c !== null);
+        gameState.hasDrawn = true;
+        console.log("Hand après pioche d'urgence:", players[socket.id].hand.length, "cartes:", players[socket.id].hand);
+        socket.emit("updateHand", players[socket.id].hand);
+        return;
+      }
       players[socket.id].hand.push(card);
+      // Remove any undefined cards that might have snuck in
+      players[socket.id].hand = players[socket.id].hand.filter(c => c !== undefined && c !== null);
       gameState.hasDrawn = true;
+      console.log("Hand après pioche:", players[socket.id].hand.length, "cartes:", players[socket.id].hand);
       socket.emit("updateHand", players[socket.id].hand);
     });
 

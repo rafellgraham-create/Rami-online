@@ -17,6 +17,7 @@ const addBotRealistBtn = document.getElementById("addBotRealistBtn");
 const startGameBtn = document.getElementById("startGameBtn");
 const stopGameBtn = document.getElementById("stopGameBtn");
 const turnIndicator = document.getElementById("turnIndicator");
+const handCountSpan = document.getElementById("handCount");
 
 // meld state on client
 let currentMeld = [];
@@ -28,6 +29,23 @@ let gameStarted = false;
 let customCardOrder = []; // Store custom ordering of cards
 
 const meldsInner = document.querySelector('.melds-inner');
+
+function ensureDrawButton() {
+  if (!handDiv || !drawBtn) return;
+  drawBtn.onclick = () => {
+    if (!isMyTurn) {
+      showToast('Patientez, ce n’est pas encore votre tour.', 'info', 1500);
+      return;
+    }
+    socket.emit("drawCard");
+  };
+  drawBtn.disabled = !isMyTurn;
+  handDiv.appendChild(drawBtn);
+}
+
+if (drawBtn) {
+  drawBtn.disabled = true;
+}
 
 // Audio setup (Web Audio) - create on demand to respect autoplay policies
 let audioCtx = null;
@@ -61,23 +79,28 @@ function playGentleTone() {
 }
 
 function renderHand(hand) {
+  if (handCountSpan) {
+    handCountSpan.textContent = String(hand.length);
+  }
+  console.log('[renderHand] Rendering', hand.length, 'cards:', hand);
   // preserve the draw button inside the hand container
-  const drawBtn = document.getElementById("drawBtn");
   handDiv.innerHTML = "";
   
-  // Sync custom order with actual hand
-  // Remove cards no longer in hand
-  customCardOrder = customCardOrder.filter(card => hand.includes(card));
+  // Filter out any undefined/null cards before rendering
+  const validHand = hand.filter(card => card !== undefined && card !== null && typeof card === 'string');
+  if (validHand.length !== hand.length) {
+    console.warn('[renderHand] Filtered out', hand.length - validHand.length, 'invalid cards');
+  }
   
-  // Add new cards that aren't in custom order yet
-  hand.forEach(card => {
-    if (!customCardOrder.includes(card)) {
-      customCardOrder.push(card);
+  // Sync custom order with actual hand - but render directly from hand to ensure all cards show
+  customCardOrder = validHand.slice();
+  
+  // Render all cards from hand (not customCardOrder to avoid sync issues)
+  validHand.forEach((card, index) => {
+    if (!card || typeof card !== 'string') {
+      console.error('[renderHand] Skipping invalid card:', card);
+      return;
     }
-  });
-  
-  // Render in custom order
-  customCardOrder.forEach((card, index) => {
     const div = document.createElement("div");
     div.className = "card";
     div.dataset.card = card;
@@ -117,10 +140,13 @@ function renderHand(hand) {
     handDiv.appendChild(div);
   });
   // re-attach the draw button at the end of the hand
-  if (drawBtn) {
-    // ensure draw button is the last child
-    drawBtn.onclick = () => socket.emit("drawCard");
-    handDiv.appendChild(drawBtn);
+  ensureDrawButton();
+  
+  // Debug: verify cards were actually rendered
+  const renderedCards = handDiv.querySelectorAll('.card').length;
+  console.log('[renderHand] Actually rendered', renderedCards, 'card elements in DOM');
+  if (renderedCards !== hand.length) {
+    console.error('[renderHand] MISMATCH! Expected', hand.length, 'cards but rendered', renderedCards);
   }
 }
 
@@ -197,38 +223,14 @@ function handleDragEnd(e) {
 socket.on("initHand", (hand) => {
   renderHand(hand);
   renderDiscardPile(); // Initialize discard pile display
+  console.log('[client] initHand', hand);
 });
 
 socket.on("updateHand", (hand) => {
-  // find newly added card(s): if hand length increased, animate the last card(s)
-  const prevCards = Array.from(document.querySelectorAll('#hand .card')).map(el => el.textContent);
+  console.log('[client] updateHand', hand);
+  // Always sync ordering with the server hand so no cards are hidden
+  customCardOrder = hand.slice();
   renderHand(hand);
-
-  // apply enter animation to cards that are new
-  const newCards = hand.filter(c => !prevCards.includes(c));
-  if (newCards.length > 0) {
-    // animate from right-to-left order: newest last
-    newCards.forEach((cardText) => {
-      // find matching card element (first occurrence)
-      const el = Array.from(document.querySelectorAll('#hand .card')).find(e => e.textContent === cardText);
-      if (el) {
-        el.classList.add('enter');
-        // after slide-in, play tone + bounce
-        el.addEventListener('animationend', () => {
-          el.classList.remove('enter');
-          // small delay then bounce
-          requestAnimationFrame(() => {
-            el.classList.add('bounce');
-            el.addEventListener('animationend', () => el.classList.remove('bounce'), { once: true });
-          });
-          // play audio; browsers require a user gesture before audio will play.
-          playGentleTone();
-          // scroll the hand to show the newly added card
-          handDiv.scrollTo({ left: handDiv.scrollWidth, behavior: 'smooth' });
-        }, { once: true });
-      }
-    });
-  }
 });
 
 socket.on("playerDiscarded", ({ player, card }) => {
@@ -277,9 +279,7 @@ if (discardDiv) {
   };
 }
 
-drawBtn.onclick = () => {
-  socket.emit("drawCard");
-};
+ensureDrawButton();
 
 // Render melds area
 function renderMelds() {
@@ -499,9 +499,7 @@ socket.on('turnStart', ({ player }) => {
     });
   }
   
-  if (drawBtn) {
-    drawBtn.disabled = !isMyTurn;
-  }
+  ensureDrawButton();
 });
 
 socket.on('playerJoined', ({ id, isBot, playerCount, botName }) => {

@@ -267,7 +267,8 @@ class RamiBot {
 function initDeck() {
   const suits = ["♠", "♥", "♦", "♣"];
   const values = ["A","2","3","4","5","6","7","8","9","10","V","D","R"];
-  deck = [];
+  // Clear existing deck by mutating it (not reassigning) so all references stay in sync
+  deck.length = 0;
   for (let s of suits) {
     for (let v of values) {
       deck.push(v + s);
@@ -275,7 +276,12 @@ function initDeck() {
   }
   deck.push("🃏");
   deck.push("🃏");
+  // Remove any undefined/null values that might have snuck in
+  const filtered = deck.filter(c => c !== undefined && c !== null);
+  deck.length = 0;
+  deck.push(...filtered);
   deck.sort(() => Math.random() - 0.5);
+  console.log("Deck initialisé:", deck.length, "cartes");
 }
 
 // Meld validation functions
@@ -350,6 +356,7 @@ function startGame(io) {
   gameState.playerOrder = Object.keys(players);
   if (gameState.playerOrder.length === 0) return;
   
+  // Always start from a fresh shuffled deck and fresh hands
   initDeck();
   gameState.playerOrder.forEach(playerId => {
     if (deck.length < 13) initDeck();
