@@ -14,6 +14,28 @@ const {
 
 // Serve static files from public directory
 const publicPath = path.join(__dirname, "../public");
+console.log("Public path:", publicPath);
+
+// Explicitly serve CSS and JS files
+app.get('/style.css', (req, res) => {
+  res.sendFile(path.join(publicPath, 'style.css'), (err) => {
+    if (err) {
+      console.error('Error serving style.css:', err);
+      res.status(404).send('Not found');
+    }
+  });
+});
+
+app.get('/script.js', (req, res) => {
+  res.sendFile(path.join(publicPath, 'script.js'), (err) => {
+    if (err) {
+      console.error('Error serving script.js:', err);
+      res.status(404).send('Not found');
+    }
+  });
+});
+
+// Serve all other static files
 app.use(express.static(publicPath, {
   maxAge: '1d',
   etag: true
