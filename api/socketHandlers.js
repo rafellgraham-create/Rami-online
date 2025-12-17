@@ -44,9 +44,8 @@ module.exports = (io) => {
       players[botId] = { hand: [], isBot: true, botDifficulty: difficulty, botName: `Bot (${difficultyName})` };
       
       // Deal cards to bot
-      const gameLogic = require('./gameLogic');
-      if (gameLogic.deck.length < 13) gameLogic.initDeck();
-      players[botId].hand = gameLogic.deck.splice(0, 13);
+      if (deck.length < 13) initDeck();
+      players[botId].hand = deck.splice(0, 13);
       bot.hand = players[botId].hand;
       
       io.emit("playerJoined", { id: botId, isBot: true, playerCount: Object.keys(players).length, botDifficulty: difficulty, botName: `Bot (${difficultyName})` });
@@ -70,13 +69,12 @@ module.exports = (io) => {
       gameState.turnIndex = 0;
       committedMelds.length = 0;
       discardPile.length = 0;
-      const gameLogic = require('./gameLogic');
-      gameLogic.initDeck();
+      initDeck();
       
       // Clear all player hands and redistribute
       Object.keys(players).forEach(playerId => {
-        if (gameLogic.deck.length < 13) gameLogic.initDeck();
-        players[playerId].hand = gameLogic.deck.splice(0, 13);
+        if (deck.length < 13) initDeck();
+        players[playerId].hand = deck.splice(0, 13);
         if (players[playerId].isBot) {
           const bot = bots[playerId];
           if (bot) bot.hand = players[playerId].hand;
@@ -101,18 +99,16 @@ module.exports = (io) => {
         return;
       }
       console.log("Le joueur", socket.id, "pioche une carte");
-      // Access deck through the module to ensure we have the latest reference
-      const gameLogic = require('./gameLogic');
-      if (gameLogic.deck.length === 0) {
+      if (deck.length === 0) {
         console.warn("Deck vide, réinitialisation...");
-        gameLogic.initDeck();
+        initDeck();
       }
-      console.log("Deck avant pioche:", gameLogic.deck.length, "cartes");
-      const card = gameLogic.deck.pop();
+      console.log("Deck avant pioche:", deck.length, "cartes");
+      const card = deck.pop();
       if (!card) {
         console.error("ERREUR: Deck vide après pop, réinitialisation d'urgence...");
-        gameLogic.initDeck();
-        const newCard = gameLogic.deck.pop();
+        initDeck();
+        const newCard = deck.pop();
         if (!newCard) {
           socket.emit('commitFailed', { message: 'Le paquet est vide. La partie est terminée.' });
           return;
