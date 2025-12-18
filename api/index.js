@@ -56,16 +56,23 @@ app.get('*', (req, res) => {
 });
 
 // Initialize Socket.io
+// On Vercel, we need to use only polling as WebSocket doesn't work with serverless functions
+const isVercel = process.env.VERCEL === '1' || process.env.VERCEL_ENV;
+const transports = isVercel ? ['polling'] : ['polling', 'websocket'];
+
 const io = new Server(httpServer, {
   cors: {
     origin: process.env.FRONTEND_URL || "*",
     methods: ["GET", "POST"]
   },
-  transports: ['polling', 'websocket'],
+  transports: transports,
   allowEIO3: true,
   path: '/socket.io/',
-  serveClient: false // We're using CDN for client library
+  serveClient: false, // We're using CDN for client library
+  allowUpgrades: !isVercel // Don't allow WebSocket upgrade on Vercel
 });
+
+console.log('[Server] Socket.io initialized with transports:', transports, 'isVercel:', isVercel);
 
 // Setup socket handlers
 require('./socketHandlers')(io);

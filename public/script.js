@@ -12,19 +12,23 @@ function initSocket() {
   try {
     // Detect if we're on Vercel (production) or local
     const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('vercel.com');
+    // On Vercel, Socket.io routes through /api/, but the path should still be /socket.io/
     const socketPath = '/socket.io/';
     
-    console.log('[Socket] Initializing connection to', window.location.origin, 'path:', socketPath);
+    console.log('[Socket] Initializing connection to', window.location.origin, 'path:', socketPath, 'isVercel:', isVercel);
+    
+    // On Vercel, use only polling as WebSocket doesn't work well with serverless functions
+    const transports = isVercel ? ['polling'] : ['polling', 'websocket'];
     
     socket = io(window.location.origin, {
-      transports: ['polling', 'websocket'],
+      transports: transports,
       reconnection: true,
       reconnectionDelay: 1000,
       reconnectionAttempts: 10,
       reconnectionDelayMax: 5000,
       path: socketPath,
       forceNew: false,
-      upgrade: true,
+      upgrade: !isVercel, // Don't upgrade to WebSocket on Vercel
       timeout: 20000
     });
 
@@ -44,6 +48,11 @@ function initSocket() {
         type: error.type,
         description: error.description
       });
+      
+      // Show user-friendly error message
+      if (document.getElementById('toasts')) {
+        showToast('Impossible de se connecter au serveur. Vercel a des limitations avec Socket.io. Essayez de rafraîchir la page ou utilisez Railway/Render pour un meilleur support WebSocket.', 'error', 8000);
+      }
     });
 
     socket.on('reconnect', (attemptNumber) => {
@@ -61,6 +70,9 @@ function initSocket() {
     socket.on('reconnect_failed', () => {
       console.error('[Socket] ❌ Reconnection failed after all attempts');
     });
+
+    // Attach all game event listeners
+    attachSocketListeners();
   } catch (error) {
     console.error('[Error] Failed to initialize socket:', error);
     // Create a dummy socket object to prevent errors
@@ -70,6 +82,176 @@ function initSocket() {
       connected: false
     };
   }
+}
+
+// Function to attach all socket event listeners
+function attachSocketListeners() {
+  if (!socket) {
+    console.warn('[attachSocketListeners] Socket not initialized yet');
+    return;
+  }
+
+  socket.on("initHand", (hand) => {
+    renderHand(hand);
+    renderDiscardPile(); // Initialize discard pile display
+    console.log('[client] initHand', hand);
+  });
+
+  socket.on("updateHand", (hand) => {
+    console.log('[client] updateHand', hand);
+    // Always sync ordering with the server hand so no cards are hidden
+    customCardOrder = hand.slice();
+    renderHand(hand);
+  });
+
+  socket.on("playerDiscarded", ({ player, card }) => {
+    // Display discard notification (optional)
+    // discardDiv.innerHTML = `<p>Le joueur ${player} a défaussé ${card}</p>`;
+  });
+
+  socket.on("discardPileUpdate", (pile) => {
+    discardPile = pile;
+    renderDiscardPile();
+  });
+
+  socket.on('meldCommitted', (data) => {
+    // data: { player, meld, targetCard }
+    melds.push(data);
+    renderMelds();
+  });
+
+  socket.on('meldUpdated', ({ meldIndex, newMeld, addedBy }) => {
+    if (meldIndex >= 0 && meldIndex < melds.length) {
+      melds[meldIndex].meld = newMeld;
+      renderMelds();
+      const isMe = addedBy === socket.id;
+      showToast(isMe ? 'Cartes ajoutées au meld!' : 'Un joueur a ajouté des cartes au meld', 'success', 2000);
+    }
+  });
+
+  socket.on('commitFailed', (err) => {
+    console.warn('commit failed', err);
+    showToast(err?.message || 'Commit failed');
+  });
+
+  socket.on('gameStarted', ({ playerOrder }) => {
+    gameStarted = true;
+    if (startGameBtn) startGameBtn.disabled = true;
+    if (addBotEasyBtn) addBotEasyBtn.style.display = 'none';
+    if (addBotMediumBtn) addBotMediumBtn.style.display = 'none';
+    if (addBotHardBtn) addBotHardBtn.style.display = 'none';
+    if (addBotRealistBtn) addBotRealistBtn.style.display = 'none';
+    if (stopGameBtn) stopGameBtn.style.display = 'inline-block';
+    showToast('La partie commence!', 'success', 2000);
+  });
+
+  socket.on('gameState', ({ gameStarted: started, currentPlayer }) => {
+    gameStarted = started;
+    if (started && startGameBtn) startGameBtn.disabled = true;
+    if (started && addBotEasyBtn) addBotEasyBtn.disabled = true;
+    if (started && addBotMediumBtn) addBotMediumBtn.disabled = true;
+    if (started && addBotHardBtn) addBotHardBtn.disabled = true;
+    if (started && addBotRealistBtn) addBotRealistBtn.disabled = true;
+  });
+
+  socket.on('turnStart', ({ player }) => {
+    isMyTurn = player === socket.id;
+    
+    if (turnIndicator) {
+      if (isMyTurn) {
+        turnIndicator.textContent = "C'est votre tour!";
+        turnIndicator.className = 'my-turn';
+      } else {
+        const isBot = player.startsWith('bot_');
+        turnIndicator.textContent = isBot ? "Tour du Bot..." : `Tour de ${player}`;
+        turnIndicator.className = '';
+      }
+    }
+    
+    // Enable/disable hand interaction
+    if (handDiv) {
+      handDiv.style.opacity = isMyTurn ? '1' : '0.6';
+      const cards = handDiv.querySelectorAll('.card');
+      cards.forEach(card => {
+        card.style.pointerEvents = isMyTurn ? 'auto' : 'none';
+      });
+    }
+    
+    ensureDrawButton();
+  });
+
+  socket.on('playerJoined', ({ id, isBot, playerCount, botName }) => {
+    if (isBot) {
+      showToast(`${botName || 'Bot'} ajouté (${playerCount} joueurs)`, 'success', 2000);
+    }
+  });
+
+  socket.on('botAction', ({ bot, action, card }) => {
+    const message = card ? `Bot: ${action} ${card}` : `Bot: ${action}`;
+    showToast(message, 'info', 2000);
+  });
+
+  socket.on('gameWon', ({ winner, winnerName, isBot }) => {
+    const isMe = winner === socket.id;
+    const message = isMe ? '🎉 Vous avez gagné! 🎉' : `${winnerName} a gagné!`;
+    const type = isMe ? 'success' : 'info';
+    
+    showToast(message, type, 6000);
+    
+    // Reset UI state
+    gameStarted = false;
+    melds = [];
+    currentMeld = [];
+    window.selectedMeldIndex = undefined;
+    discardPile = [];
+    customCardOrder = [];
+    
+    renderMelds();
+    renderDiscardPile();
+    
+    // Re-enable game controls
+    if (startGameBtn) startGameBtn.disabled = false;
+    if (addBotEasyBtn) addBotEasyBtn.style.display = 'inline-block';
+    if (addBotMediumBtn) addBotMediumBtn.style.display = 'inline-block';
+    if (addBotHardBtn) addBotHardBtn.style.display = 'inline-block';
+    if (addBotRealistBtn) addBotRealistBtn.style.display = 'inline-block';
+    if (stopGameBtn) stopGameBtn.style.display = 'none';
+    
+    // Clear turn indicator
+    if (turnIndicator) {
+      turnIndicator.textContent = message;
+      turnIndicator.className = isMe ? 'my-turn' : '';
+    }
+  });
+
+  socket.on('gameStopped', () => {
+    showToast('La partie a été arrêtée', 'info', 3000);
+    
+    // Reset UI state
+    gameStarted = false;
+    melds = [];
+    currentMeld = [];
+    window.selectedMeldIndex = undefined;
+    discardPile = [];
+    customCardOrder = [];
+    
+    renderMelds();
+    renderDiscardPile();
+    
+    // Re-enable game controls
+    if (startGameBtn) startGameBtn.disabled = false;
+    if (addBotEasyBtn) addBotEasyBtn.style.display = 'inline-block';
+    if (addBotMediumBtn) addBotMediumBtn.style.display = 'inline-block';
+    if (addBotHardBtn) addBotHardBtn.style.display = 'inline-block';
+    if (addBotRealistBtn) addBotRealistBtn.style.display = 'inline-block';
+    if (stopGameBtn) stopGameBtn.style.display = 'none';
+    
+    // Clear turn indicator
+    if (turnIndicator) {
+      turnIndicator.textContent = '';
+      turnIndicator.className = '';
+    }
+  });
 }
 
 // Start initialization
@@ -304,23 +486,7 @@ function handleDragEnd(e) {
   });
 }
 
-socket.on("initHand", (hand) => {
-  renderHand(hand);
-  renderDiscardPile(); // Initialize discard pile display
-  console.log('[client] initHand', hand);
-});
-
-socket.on("updateHand", (hand) => {
-  console.log('[client] updateHand', hand);
-  // Always sync ordering with the server hand so no cards are hidden
-  customCardOrder = hand.slice();
-  renderHand(hand);
-});
-
-socket.on("playerDiscarded", ({ player, card }) => {
-  // Display discard notification (optional)
-  // discardDiv.innerHTML = `<p>Le joueur ${player} a défaussé ${card}</p>`;
-});
+// Socket listeners are now attached in attachSocketListeners() function
 
 // Render discard pile
 function renderDiscardPile() {
@@ -348,11 +514,7 @@ function renderDiscardPile() {
   }
 }
 
-// Listen for discard pile updates
-socket.on("discardPileUpdate", (pile) => {
-  discardPile = pile;
-  renderDiscardPile();
-});
+// Listen for discard pile updates (moved to attachSocketListeners)
 
 // Click discard pile to draw from it
 if (discardDiv) {
@@ -462,28 +624,7 @@ document.addEventListener('keydown', (ev) => {
   }
 });
 
-// receive meld broadcasts
-socket.on('meldCommitted', (data) => {
-  // data: { player, meld, targetCard }
-  melds.push(data);
-  renderMelds();
-});
-
-// receive meld update broadcasts
-socket.on('meldUpdated', ({ meldIndex, newMeld, addedBy }) => {
-  if (meldIndex >= 0 && meldIndex < melds.length) {
-    melds[meldIndex].meld = newMeld;
-    renderMelds();
-    const isMe = addedBy === socket.id;
-    showToast(isMe ? 'Cartes ajoutées au meld!' : 'Un joueur a ajouté des cartes au meld', 'success', 2000);
-  }
-});
-
-// handle commit failures from server
-socket.on('commitFailed', (err) => {
-  console.warn('commit failed', err);
-  showToast(err?.message || 'Commit failed');
-});
+// Meld and game event listeners moved to attachSocketListeners()
 
 // small toast utility
 const toasts = document.getElementById('toasts');
@@ -539,127 +680,7 @@ if (stopGameBtn) {
   };
 }
 
-// Game state listeners
-socket.on('gameStarted', ({ playerOrder }) => {
-  gameStarted = true;
-  if (startGameBtn) startGameBtn.disabled = true;
-  if (addBotEasyBtn) addBotEasyBtn.style.display = 'none';
-  if (addBotMediumBtn) addBotMediumBtn.style.display = 'none';
-  if (addBotHardBtn) addBotHardBtn.style.display = 'none';
-  if (addBotRealistBtn) addBotRealistBtn.style.display = 'none';
-  if (stopGameBtn) stopGameBtn.style.display = 'inline-block';
-  showToast('La partie commence!', 'success', 2000);
-});
-
-socket.on('gameState', ({ gameStarted: started, currentPlayer }) => {
-  gameStarted = started;
-  if (started && startGameBtn) startGameBtn.disabled = true;
-  if (started && addBotEasyBtn) addBotEasyBtn.disabled = true;
-  if (started && addBotMediumBtn) addBotMediumBtn.disabled = true;
-  if (started && addBotHardBtn) addBotHardBtn.disabled = true;
-  if (started && addBotRealistBtn) addBotRealistBtn.disabled = true;
-});
-
-socket.on('turnStart', ({ player }) => {
-  isMyTurn = player === socket.id;
-  
-  if (turnIndicator) {
-    if (isMyTurn) {
-      turnIndicator.textContent = "C'est votre tour!";
-      turnIndicator.className = 'my-turn';
-    } else {
-      const isBot = player.startsWith('bot_');
-      turnIndicator.textContent = isBot ? "Tour du Bot..." : `Tour de ${player}`;
-      turnIndicator.className = '';
-    }
-  }
-  
-  // Enable/disable hand interaction
-  if (handDiv) {
-    handDiv.style.opacity = isMyTurn ? '1' : '0.6';
-    const cards = handDiv.querySelectorAll('.card');
-    cards.forEach(card => {
-      card.style.pointerEvents = isMyTurn ? 'auto' : 'none';
-    });
-  }
-  
-  ensureDrawButton();
-});
-
-socket.on('playerJoined', ({ id, isBot, playerCount, botName }) => {
-  if (isBot) {
-    showToast(`${botName || 'Bot'} ajouté (${playerCount} joueurs)`, 'success', 2000);
-  }
-});
-
-socket.on('botAction', ({ bot, action, card }) => {
-  const message = card ? `Bot: ${action} ${card}` : `Bot: ${action}`;
-  showToast(message, 'info', 2000);
-});
-
-// Handle game won
-socket.on('gameWon', ({ winner, winnerName, isBot }) => {
-  const isMe = winner === socket.id;
-  const message = isMe ? '🎉 Vous avez gagné! 🎉' : `${winnerName} a gagné!`;
-  const type = isMe ? 'success' : 'info';
-  
-  showToast(message, type, 6000);
-  
-  // Reset UI state
-  gameStarted = false;
-  melds = [];
-  currentMeld = [];
-  window.selectedMeldIndex = undefined;
-  discardPile = [];
-  customCardOrder = [];
-  
-  renderMelds();
-  renderDiscardPile();
-  
-  // Re-enable game controls
-  if (startGameBtn) startGameBtn.disabled = false;
-  if (addBotEasyBtn) addBotEasyBtn.style.display = 'inline-block';
-  if (addBotMediumBtn) addBotMediumBtn.style.display = 'inline-block';
-  if (addBotHardBtn) addBotHardBtn.style.display = 'inline-block';
-  if (addBotRealistBtn) addBotRealistBtn.style.display = 'inline-block';
-  if (stopGameBtn) stopGameBtn.style.display = 'none';
-  
-  // Clear turn indicator
-  if (turnIndicator) {
-    turnIndicator.textContent = message;
-    turnIndicator.className = isMe ? 'my-turn' : '';
-  }
-});
-
-// Handle game stopped
-socket.on('gameStopped', () => {
-  showToast('La partie a été arrêtée', 'info', 3000);
-  
-  // Reset UI state
-  gameStarted = false;
-  melds = [];
-  currentMeld = [];
-  window.selectedMeldIndex = undefined;
-  discardPile = [];
-  customCardOrder = [];
-  
-  renderMelds();
-  renderDiscardPile();
-  
-  // Re-enable game controls
-  if (startGameBtn) startGameBtn.disabled = false;
-  if (addBotEasyBtn) addBotEasyBtn.style.display = 'inline-block';
-  if (addBotMediumBtn) addBotMediumBtn.style.display = 'inline-block';
-  if (addBotHardBtn) addBotHardBtn.style.display = 'inline-block';
-  if (addBotRealistBtn) addBotRealistBtn.style.display = 'inline-block';
-  if (stopGameBtn) stopGameBtn.style.display = 'none';
-  
-  // Clear turn indicator
-  if (turnIndicator) {
-    turnIndicator.textContent = '';
-    turnIndicator.className = '';
-  }
-});
+// All game state listeners moved to attachSocketListeners()
 
 // Ensure DOM is ready before verifying elements
 document.addEventListener('DOMContentLoaded', () => {
