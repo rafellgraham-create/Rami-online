@@ -62,7 +62,9 @@ const io = new Server(httpServer, {
     methods: ["GET", "POST"]
   },
   transports: ['polling', 'websocket'],
-  allowEIO3: true
+  allowEIO3: true,
+  path: '/socket.io/',
+  serveClient: false // We're using CDN for client library
 });
 
 // Setup socket handlers

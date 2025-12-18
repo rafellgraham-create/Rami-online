@@ -1,39 +1,82 @@
 // Initialize socket with error handling
 let socket;
-try {
+
+// Wait for Socket.io library to load
+function initSocket() {
   if (typeof io === 'undefined') {
-    console.error('[Error] Socket.io library not loaded!');
-    throw new Error('Socket.io library not found');
+    console.error('[Error] Socket.io library not loaded! Retrying in 500ms...');
+    setTimeout(initSocket, 500);
+    return;
   }
   
-  socket = io(window.location.origin, {
-    transports: ['polling', 'websocket'], // Try websocket first, fallback to polling
-    reconnection: true,
-    reconnectionDelay: 1000,
-    reconnectionAttempts: 5,
-    path: '/socket.io/'
-  });
+  try {
+    // Detect if we're on Vercel (production) or local
+    const isVercel = window.location.hostname.includes('vercel.app') || window.location.hostname.includes('vercel.com');
+    const socketPath = '/socket.io/';
+    
+    console.log('[Socket] Initializing connection to', window.location.origin, 'path:', socketPath);
+    
+    socket = io(window.location.origin, {
+      transports: ['polling', 'websocket'],
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionAttempts: 10,
+      reconnectionDelayMax: 5000,
+      path: socketPath,
+      forceNew: false,
+      upgrade: true,
+      timeout: 20000
+    });
 
-  // Debug connection
-  socket.on('connect', () => {
-    console.log('[Socket] Connected:', socket.id);
-  });
+    // Debug connection
+    socket.on('connect', () => {
+      console.log('[Socket] ✅ Connected:', socket.id);
+    });
 
-  socket.on('disconnect', () => {
-    console.log('[Socket] Disconnected');
-  });
+    socket.on('disconnect', (reason) => {
+      console.warn('[Socket] ❌ Disconnected:', reason);
+    });
 
-  socket.on('connect_error', (error) => {
-    console.error('[Socket] Connection error:', error);
-  });
-} catch (error) {
-  console.error('[Error] Failed to initialize socket:', error);
-  // Create a dummy socket object to prevent errors
-  socket = {
-    emit: () => console.warn('[Socket] Socket not connected, cannot emit'),
-    on: () => {},
-    connected: false
-  };
+    socket.on('connect_error', (error) => {
+      console.error('[Socket] ❌ Connection error:', error);
+      console.error('[Socket] Error details:', {
+        message: error.message,
+        type: error.type,
+        description: error.description
+      });
+    });
+
+    socket.on('reconnect', (attemptNumber) => {
+      console.log('[Socket] ✅ Reconnected after', attemptNumber, 'attempts');
+    });
+
+    socket.on('reconnect_attempt', (attemptNumber) => {
+      console.log('[Socket] 🔄 Reconnection attempt', attemptNumber);
+    });
+
+    socket.on('reconnect_error', (error) => {
+      console.error('[Socket] ❌ Reconnection error:', error);
+    });
+
+    socket.on('reconnect_failed', () => {
+      console.error('[Socket] ❌ Reconnection failed after all attempts');
+    });
+  } catch (error) {
+    console.error('[Error] Failed to initialize socket:', error);
+    // Create a dummy socket object to prevent errors
+    socket = {
+      emit: () => console.warn('[Socket] Socket not connected, cannot emit'),
+      on: () => {},
+      connected: false
+    };
+  }
+}
+
+// Start initialization
+if (document.readyState === 'loading') {
+  document.addEventListener('DOMContentLoaded', initSocket);
+} else {
+  initSocket();
 }
 
 const handDiv = document.getElementById("hand");
@@ -60,6 +103,17 @@ let customCardOrder = []; // Store custom ordering of cards
 
 const meldsInner = document.querySelector('.melds-inner');
 
+// Helper function to check socket connection before emitting
+function safeEmit(event, data) {
+  if (!socket || !socket.connected) {
+    console.error('[Socket] Not connected, cannot emit:', event);
+    showToast('Connexion perdue. Veuillez rafraîchir la page.', 'error', 4000);
+    return false;
+  }
+  socket.emit(event, data);
+  return true;
+}
+
 function ensureDrawButton() {
   if (!handDiv || !drawBtn) return;
   drawBtn.onclick = () => {
@@ -67,7 +121,7 @@ function ensureDrawButton() {
       showToast('Patientez, ce n’est pas encore votre tour.', 'info', 1500);
       return;
     }
-    socket.emit("drawCard");
+    safeEmit("drawCard");
   };
   drawBtn.disabled = !isMyTurn;
   handDiv.appendChild(drawBtn);
@@ -144,7 +198,7 @@ function renderHand(hand) {
       div.classList.add('red');
     }
     
-    div.onclick = () => socket.emit("discardCard", card);
+    div.onclick = () => safeEmit("discardCard", card);
     
     // mouse handlers to track hovered card
     div.addEventListener('mouseenter', () => {
@@ -304,7 +358,7 @@ socket.on("discardPileUpdate", (pile) => {
 if (discardDiv) {
   discardDiv.onclick = () => {
     if (discardPile.length > 0) {
-      socket.emit("drawFromDiscard");
+      safeEmit("drawFromDiscard");
     }
   };
 }
@@ -385,7 +439,7 @@ document.addEventListener('keydown', (ev) => {
     if (currentMeld.length > 0) {
       const target = hoveredCard || null;
       console.log('Attempting commitMeld payload:', { meld: currentMeld.slice(), targetCard: target });
-      socket.emit('commitMeld', { meld: currentMeld.slice(), targetCard: target });
+      safeEmit('commitMeld', { meld: currentMeld.slice(), targetCard: target });
       // clear local selection; server will broadcast the committed meld
       currentMeld = [];
       // remove selected classes
@@ -395,7 +449,7 @@ document.addEventListener('keydown', (ev) => {
   // 'a' to add selected cards to a meld (must click on a meld first)
   if (ev.key === 'a' || ev.key === 'A') {
     if (currentMeld.length > 0 && window.selectedMeldIndex !== undefined) {
-      socket.emit('addToMeld', { meldIndex: window.selectedMeldIndex, cards: currentMeld.slice() });
+      safeEmit('addToMeld', { meldIndex: window.selectedMeldIndex, cards: currentMeld.slice() });
       // clear local selection
       currentMeld = [];
       window.selectedMeldIndex = undefined;
@@ -449,38 +503,38 @@ function showToast(text, type = 'error', ttl = 4000) {
 // Bot controls
 if (addBotEasyBtn) {
   addBotEasyBtn.onclick = () => {
-    socket.emit('addBot', 'easy');
+    safeEmit('addBot', 'easy');
   };
 }
 
 if (addBotMediumBtn) {
   addBotMediumBtn.onclick = () => {
-    socket.emit('addBot', 'medium');
+    safeEmit('addBot', 'medium');
   };
 }
 
 if (addBotHardBtn) {
   addBotHardBtn.onclick = () => {
-    socket.emit('addBot', 'hard');
+    safeEmit('addBot', 'hard');
   };
 }
 
 if (addBotRealistBtn) {
   addBotRealistBtn.onclick = () => {
-    socket.emit('addBot', 'realist');
+    safeEmit('addBot', 'realist');
   };
 }
 
 if (startGameBtn) {
   startGameBtn.onclick = () => {
-    socket.emit('startGame');
+    safeEmit('startGame');
   };
 }
 
 if (stopGameBtn) {
   stopGameBtn.onclick = () => {
     if (confirm('Êtes-vous sûr de vouloir arrêter la partie?')) {
-      socket.emit('stopGame');
+      safeEmit('stopGame');
     }
   };
 }
@@ -607,8 +661,55 @@ socket.on('gameStopped', () => {
   }
 });
 
-// Debug: Verify all elements are found
-console.log('[Debug] Elements check:', {
+// Ensure DOM is ready before verifying elements
+document.addEventListener('DOMContentLoaded', () => {
+  console.log('[DOMContentLoaded] Initializing...');
+  console.log('[Debug] Elements check:', {
+    handDiv: !!handDiv,
+    drawBtn: !!drawBtn,
+    startGameBtn: !!startGameBtn,
+    socket: !!socket,
+    socketConnected: socket?.connected,
+    socketId: socket?.id
+  });
+  
+  // Re-attach button handlers in case they weren't found initially
+  if (addBotEasyBtn && !addBotEasyBtn.onclick) {
+    addBotEasyBtn.onclick = () => safeEmit('addBot', 'easy');
+  }
+  if (addBotMediumBtn && !addBotMediumBtn.onclick) {
+    addBotMediumBtn.onclick = () => safeEmit('addBot', 'medium');
+  }
+  if (addBotHardBtn && !addBotHardBtn.onclick) {
+    addBotHardBtn.onclick = () => safeEmit('addBot', 'hard');
+  }
+  if (addBotRealistBtn && !addBotRealistBtn.onclick) {
+    addBotRealistBtn.onclick = () => safeEmit('addBot', 'realist');
+  }
+  if (startGameBtn && !startGameBtn.onclick) {
+    startGameBtn.onclick = () => safeEmit('startGame');
+  }
+  if (stopGameBtn && !stopGameBtn.onclick) {
+    stopGameBtn.onclick = () => {
+      if (confirm('Êtes-vous sûr de vouloir arrêter la partie?')) {
+        safeEmit('stopGame');
+      }
+    };
+  }
+  
+  ensureDrawButton();
+  
+  // Check if socket is connected, if not, show error
+  if (!socket || !socket.connected) {
+    console.warn('[DOMContentLoaded] Socket not connected yet, waiting...');
+    socket.once('connect', () => {
+      console.log('[DOMContentLoaded] Socket connected after DOM ready');
+    });
+  }
+});
+
+// Debug: Verify all elements are found (also log immediately)
+console.log('[Debug] Elements check (immediate):', {
   handDiv: !!handDiv,
   drawBtn: !!drawBtn,
   startGameBtn: !!startGameBtn,
