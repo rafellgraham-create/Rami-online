@@ -8,6 +8,7 @@
   },
   "dependencies": {
     "express": "^4.21.2",
+    "next": "^15.5.9",
     "socket.io": "^4.8.1"
   },
   "engines": {
