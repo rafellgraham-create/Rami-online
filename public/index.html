@@ -2,10 +2,12 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Rami en ligne</title>
   <link rel="stylesheet" href="/style.css">
 </head>
 <body>
+  <button id="helpBtn" class="help-btn" title="Aide et règles du jeu">?</button>
   <h1>Jeu de Rami</h1>
   
   <!-- Game controls -->
@@ -16,6 +18,9 @@
       <button id="addBotHardBtn" class="control-btn bot-btn">Ajouter Bot Difficile</button>
       <button id="addBotRealistBtn" class="control-btn bot-btn">Ajouter Bot Réaliste</button>
     </div>
+    <div style="margin-bottom: 10px;">
+      <button id="removeAllBotsBtn" class="control-btn" style="background-color: #d32f2f;">Supprimer tous les bots</button>
+    </div>
     <div>
       <button id="startGameBtn" class="control-btn">Démarrer la partie</button>
       <button id="stopGameBtn" class="control-btn stop-btn" style="display: none;">Arrêter la partie</button>
@@ -23,6 +28,14 @@
     <div id="turnIndicator" style="margin-top: 10px; font-size: 18px; color: #ffd966;"></div>
   </div>
   
+  <!-- Mobile action buttons (hidden on desktop) -->
+  <div id="mobileActions" class="mobile-actions">
+    <button id="mobileSelectBtn" class="mobile-action-btn">Sélectionner</button>
+    <button id="mobileMeldBtn" class="mobile-action-btn">Créer suite</button>
+    <button id="mobileAddToMeldBtn" class="mobile-action-btn">Ajouter à suite</button>
+    <button id="mobileDiscardBtn" class="mobile-action-btn">Défausser</button>
+  </div>
+
   <div id="hand">
     <button id="drawBtn">Piocher</button>
   </div>
@@ -58,6 +71,91 @@
 
   <!-- Toasts for errors / notifications -->
   <div id="toasts" aria-live="polite" aria-atomic="true"></div>
+
+  <!-- Help Modal -->
+  <div id="helpModal" class="modal">
+    <div class="modal-content">
+      <span class="modal-close">&times;</span>
+      <div class="modal-body">
+        <h2>Comment jouer:</h2>
+        <p>Le but est d'être le premier joueur à se débarrasser de toutes ses cartes, en les posant dans des suites, sur la table de jeu.</p>
+        
+        <p>Un joueur peut former pendant son tour:</p>
+        <ul>
+          <li>une suite de minimum 3 cartes consécutives de la même famille (ex: A♣, 2♣, 3♣) (10♣, V♣, D♣, R♣)</li>
+          <li>ou minimum 3 de même valeur mais de familles différentes (ex: D♦ D♠ D♥)</li>
+        </ul>
+        
+        <p>On peut aussi ajouter ses cartes dans une suite déjà sur la table si elles respectent la combinaison (ex: D♣ → D♦ D♠ D♥) (4♣ → A♣, 2♣, 3♣)</p>
+        
+        <p>Chaque tour, il est possible de piocher soit une carte aléatoire dans la pioche, ou une carte défaussée par le joueur précédent.</p>
+        
+        <p>Il faut ensuite défausser une carte pour marquer la fin de son tour</p>
+        
+        <p><strong>Pas de système de points minimum pour poser une suite ici dans cette version du rami</strong></p>
+        
+        <hr>
+        
+        <h2>Contrôles:</h2>
+        <h3>Desktop (Clavier):</h3>
+        <ul>
+          <li><strong>S</strong> : sélectionner/déselectionner une carte</li>
+          <li><strong>Z</strong> : ajouter une suite avec les cartes sélectionnées</li>
+          <li><strong>A</strong> : ajouter une carte à une suite préexistante</li>
+          <li><strong>D</strong> : défausser une carte (fin de tour)</li>
+        </ul>
+
+        <p>Clique gauche sur une suite pour la sélectionner/déselectionner</p>
+        
+        <h3>Mobile (Tactile):</h3>
+        <ul>
+          <li><strong>Appuyer sur une carte</strong> : la marquer comme cible avant d'appuyer sur les boutons souhaités</li>
+          <li><strong>Appuyer sur une suite</strong> : la sélectionner pour y ajouter des cartes</li>
+        </ul>
+
+        <p>Glisser avec son doigt la barre de carte vers la droite pour voir les autres cartes et piocher</p>
+        <p>Glisser la table de jeu de haut en bas pour voir les autres suites si necéssaire</p>
+        
+        <hr>
+        
+        <h2>Difficulté Bots:</h2>
+        
+        <h3>Bot Facile:</h3>
+        <ul>
+          <li>Temps de réflexion : 2 secondes</li>
+          <li>Probabilité de créer une suite : 50%</li>
+          <li>Probabilité d'ajouter à une suite existante : 30%</li>
+          <li>Probabilité de défausse intelligente* : 20%</li>
+        </ul>
+        
+        <h3>Bot Moyen:</h3>
+        <ul>
+          <li>Temps de réflexion : 1.5 secondes</li>
+          <li>Probabilité de créer une suite : 75%</li>
+          <li>Probabilité d'ajouter à une suite existante : 60%</li>
+          <li>Probabilité de défausse intelligente* : 50%</li>
+        </ul>
+        
+        <h3>Bot Difficile:</h3>
+        <ul>
+          <li>Temps de réflexion : 1 seconde</li>
+          <li>Probabilité de créer une suite : 95%</li>
+          <li>Probabilité d'ajouter à une suite existante : 90%</li>
+          <li>Probabilité de défausse intelligente* : 85%</li>
+        </ul>
+        
+        <h3>Bot Réaliste:</h3>
+        <ul>
+          <li>Temps de réflexion : 0.4 secondes</li>
+          <li>Probabilité de créer une suite : 100%</li>
+          <li>Probabilité d'ajouter à une suite existante : 100%</li>
+          <li>Probabilité de défausse intelligente* : 100%</li>
+        </ul>
+        
+        <p><em>*La défausse intelligente permet au bot de se débarrasser de la carte la moins utile, sinon le bot défausse aléatoirement l'autre partie du temps</em></p>
+      </div>
+    </div>
+  </div>
 
   <script src="https://cdn.socket.io/4.8.1/socket.io.min.js"></script>
   <script src="/script.js"></script>

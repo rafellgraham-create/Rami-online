@@ -35,6 +35,12 @@ module.exports = (io) => {
 
     // Add bot
     socket.on("addBot", (difficulty = 'medium') => {
+      // Prevent adding bots if game is started
+      if (gameState.gameStarted) {
+        socket.emit('commitFailed', { message: 'Impossible d\'ajouter un bot pendant une partie.' });
+        return;
+      }
+      
       const botId = `bot_${Date.now()}`;
       const difficultyName = difficulty === 'easy' ? 'Facile' : 
                             difficulty === 'hard' ? 'Difficile' : 
@@ -50,6 +56,29 @@ module.exports = (io) => {
       
       io.emit("playerJoined", { id: botId, isBot: true, playerCount: Object.keys(players).length, botDifficulty: difficulty, botName: `Bot (${difficultyName})` });
       console.log(`Bot ajouté (${difficultyName}):`, botId);
+    });
+
+    // Remove all bots
+    socket.on("removeAllBots", () => {
+      // Prevent removing bots if game is started
+      if (gameState.gameStarted) {
+        socket.emit('commitFailed', { message: 'Impossible de supprimer les bots pendant une partie.' });
+        return;
+      }
+      
+      const botIds = Object.keys(bots);
+      let removedCount = 0;
+      
+      botIds.forEach(botId => {
+        // Remove bot from bots object
+        delete bots[botId];
+        // Remove bot from players object
+        delete players[botId];
+        removedCount++;
+      });
+      
+      console.log(`${removedCount} bot(s) supprimé(s)`);
+      io.emit("allBotsRemoved", { removedCount, playerCount: Object.keys(players).length });
     });
 
     // Start game

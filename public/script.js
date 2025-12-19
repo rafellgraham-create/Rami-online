@@ -22,8 +22,8 @@ function initSocket() {
     
     socket = io(window.location.origin, {
       transports: transports,
-      reconnection: true,
-      reconnectionDelay: 1000,
+  reconnection: true,
+  reconnectionDelay: 1000,
       reconnectionAttempts: 10,
       reconnectionDelayMax: 5000,
       path: socketPath,
@@ -99,8 +99,38 @@ function attachSocketListeners() {
 
   socket.on("updateHand", (hand) => {
     console.log('[client] updateHand', hand);
-    // Always sync ordering with the server hand so no cards are hidden
-    customCardOrder = hand.slice();
+    // Preserve custom ordering: only add/remove cards that changed
+    const validHand = hand.filter(card => card !== undefined && card !== null && typeof card === 'string');
+    
+    // Create a map of card counts from server hand
+    const serverCardCounts = {};
+    validHand.forEach(card => {
+      serverCardCounts[card] = (serverCardCounts[card] || 0) + 1;
+    });
+    
+    // Create a map of card counts from current custom order
+    const currentCardCounts = {};
+    customCardOrder.forEach(card => {
+      currentCardCounts[card] = (currentCardCounts[card] || 0) + 1;
+    });
+    
+    // Remove cards that are no longer in the server hand
+    customCardOrder = customCardOrder.filter(card => {
+      if (serverCardCounts[card] && serverCardCounts[card] > 0) {
+        serverCardCounts[card]--;
+        return true;
+      }
+      return false;
+    });
+    
+    // Add new cards that appeared in the server hand (add them at the end)
+    Object.keys(serverCardCounts).forEach(card => {
+      const count = serverCardCounts[card];
+      for (let i = 0; i < count; i++) {
+        customCardOrder.push(card);
+      }
+    });
+    
     renderHand(hand);
   });
 
@@ -141,6 +171,7 @@ function attachSocketListeners() {
     if (addBotMediumBtn) addBotMediumBtn.style.display = 'none';
     if (addBotHardBtn) addBotHardBtn.style.display = 'none';
     if (addBotRealistBtn) addBotRealistBtn.style.display = 'none';
+    if (removeAllBotsBtn) removeAllBotsBtn.style.display = 'none';
     if (stopGameBtn) stopGameBtn.style.display = 'inline-block';
     showToast('La partie commence!', 'success', 2000);
   });
@@ -178,12 +209,21 @@ function attachSocketListeners() {
     }
     
     ensureDrawButton();
+    updateMobileButtons();
   });
 
   socket.on('playerJoined', ({ id, isBot, playerCount, botName }) => {
     if (isBot) {
       showToast(`${botName || 'Bot'} ajouté (${playerCount} joueurs)`, 'success', 2000);
+      // Re-enable bot buttons after successful addition
+      enableBotButtons();
     }
+  });
+
+  socket.on('allBotsRemoved', ({ removedCount, playerCount }) => {
+    showToast(`${removedCount} bot(s) supprimé(s) (${playerCount} joueur(s) restant(s))`, 'info', 3000);
+    // Re-enable bot buttons after removal
+    enableBotButtons();
   });
 
   socket.on('botAction', ({ bot, action, card }) => {
@@ -215,7 +255,11 @@ function attachSocketListeners() {
     if (addBotMediumBtn) addBotMediumBtn.style.display = 'inline-block';
     if (addBotHardBtn) addBotHardBtn.style.display = 'inline-block';
     if (addBotRealistBtn) addBotRealistBtn.style.display = 'inline-block';
+    if (removeAllBotsBtn) removeAllBotsBtn.style.display = 'inline-block';
     if (stopGameBtn) stopGameBtn.style.display = 'none';
+    
+    // Re-enable bot buttons
+    enableBotButtons();
     
     // Clear turn indicator
     if (turnIndicator) {
@@ -244,7 +288,11 @@ function attachSocketListeners() {
     if (addBotMediumBtn) addBotMediumBtn.style.display = 'inline-block';
     if (addBotHardBtn) addBotHardBtn.style.display = 'inline-block';
     if (addBotRealistBtn) addBotRealistBtn.style.display = 'inline-block';
+    if (removeAllBotsBtn) removeAllBotsBtn.style.display = 'inline-block';
     if (stopGameBtn) stopGameBtn.style.display = 'none';
+    
+    // Re-enable bot buttons
+    enableBotButtons();
     
     // Clear turn indicator
     if (turnIndicator) {
@@ -269,6 +317,7 @@ const addBotEasyBtn = document.getElementById("addBotEasyBtn");
 const addBotMediumBtn = document.getElementById("addBotMediumBtn");
 const addBotHardBtn = document.getElementById("addBotHardBtn");
 const addBotRealistBtn = document.getElementById("addBotRealistBtn");
+const removeAllBotsBtn = document.getElementById("removeAllBotsBtn");
 const startGameBtn = document.getElementById("startGameBtn");
 const stopGameBtn = document.getElementById("stopGameBtn");
 const turnIndicator = document.getElementById("turnIndicator");
@@ -277,11 +326,16 @@ const handCountSpan = document.getElementById("handCount");
 // meld state on client
 let currentMeld = [];
 let hoveredCard = null;
+let lastTappedCard = null; // For mobile: track last tapped card
 let melds = []; // list of committed melds to render
 let discardPile = []; // track discard pile cards
 let isMyTurn = false;
 let gameStarted = false;
 let customCardOrder = []; // Store custom ordering of cards
+
+// Detect if we're on mobile
+const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+                (window.innerWidth <= 768);
 
 const meldsInner = document.querySelector('.melds-inner');
 
@@ -358,11 +412,14 @@ function renderHand(hand) {
     console.warn('[renderHand] Filtered out', hand.length - validHand.length, 'invalid cards');
   }
   
-  // Sync custom order with actual hand - but render directly from hand to ensure all cards show
-  customCardOrder = validHand.slice();
+  // Ensure customCardOrder is initialized if empty (first time)
+  if (customCardOrder.length === 0) {
+    customCardOrder = validHand.slice();
+  }
   
-  // Render all cards from hand (not customCardOrder to avoid sync issues)
-  validHand.forEach((card, index) => {
+  // Render cards in custom order (preserving user's organization)
+  // customCardOrder is already updated by updateHand to match server hand
+  customCardOrder.forEach((card, index) => {
     if (!card || typeof card !== 'string') {
       console.error('[renderHand] Skipping invalid card:', card);
       return;
@@ -380,9 +437,8 @@ function renderHand(hand) {
       div.classList.add('red');
     }
     
-    div.onclick = () => safeEmit("discardCard", card);
-    
-    // mouse handlers to track hovered card
+    // mouse handlers to track hovered card (desktop only)
+    if (!isMobile) {
     div.addEventListener('mouseenter', () => {
       hoveredCard = card;
       div.classList.add('hovered');
@@ -391,13 +447,47 @@ function renderHand(hand) {
       hoveredCard = null;
       div.classList.remove('hovered');
     });
+    }
+
+    // Mobile: tap to mark card as target (for operations), not to select for meld
+    if (isMobile) {
+      div.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        // Remove target class from all cards
+        document.querySelectorAll('#hand .card').forEach(c => c.classList.remove('target'));
+        // Mark this card as target
+        lastTappedCard = card;
+        div.classList.add('target');
+        updateMobileButtons();
+      });
+      
+      // Also support click for hybrid devices
+      div.addEventListener('click', (e) => {
+        if (isMobile) {
+          e.preventDefault();
+          e.stopPropagation();
+          // Remove target class from all cards
+          document.querySelectorAll('#hand .card').forEach(c => c.classList.remove('target'));
+          // Mark this card as target
+          lastTappedCard = card;
+          div.classList.add('target');
+          updateMobileButtons();
+        }
+      });
+    }
 
     // reflect selection if card is part of currentMeld
     if (currentMeld.includes(card)) {
       div.classList.add('selected');
     }
     
-    // Drag and drop handlers
+    // reflect target if card is the last tapped card (mobile)
+    if (isMobile && lastTappedCard === card) {
+      div.classList.add('target');
+    }
+    
+    // Drag and drop handlers (desktop only, or allow on mobile for reordering)
     div.addEventListener('dragstart', handleDragStart);
     div.addEventListener('dragover', handleDragOver);
     div.addEventListener('drop', handleDrop);
@@ -407,6 +497,9 @@ function renderHand(hand) {
   });
   // re-attach the draw button at the end of the hand
   ensureDrawButton();
+  
+  // Update mobile buttons state
+  updateMobileButtons();
   
   // Debug: verify cards were actually rendered
   const renderedCards = handDiv.querySelectorAll('.card').length;
@@ -544,15 +637,36 @@ function renderMelds() {
     container.className = 'meld';
     container.dataset.meldIndex = index;
     
-    // Make meld clickable to select it for adding cards
+    // Make meld clickable/tappable to select it for adding cards
     container.onclick = () => {
+      // If this meld is already selected, deselect it
+      if (window.selectedMeldIndex === index) {
+        container.classList.remove('selected-meld');
+        window.selectedMeldIndex = undefined;
+        showToast('Meld désélectionné', 'info', 1500);
+        updateMobileButtons();
+        return;
+      }
+      
       // Remove previous selection
       document.querySelectorAll('.meld.selected-meld').forEach(el => el.classList.remove('selected-meld'));
       // Select this meld
       container.classList.add('selected-meld');
       window.selectedMeldIndex = index;
-      showToast(`Meld sélectionné. Appuyez sur 'E' pour sélectionner des cartes, puis 'A' pour les ajouter.`, 'info', 3000);
+      const message = isMobile 
+        ? 'Meld sélectionné. Sélectionnez des cartes puis appuyez sur "Ajouter à suite".'
+        : `Meld sélectionné. Appuyez sur 'S' pour sélectionner des cartes, puis 'A' pour les ajouter.`;
+      showToast(message, 'info', 3000);
+      updateMobileButtons();
     };
+    
+    // Also support touch for mobile
+    if (isMobile) {
+      container.addEventListener('touchstart', (e) => {
+        e.preventDefault();
+        container.click();
+      });
+    }
     
     const owner = document.createElement('div');
     owner.className = 'meld-owner';
@@ -578,34 +692,47 @@ function renderMelds() {
   });
 }
 
-// Keyboard handlers: 'e' to add hovered card to current meld, 'r' to commit meld
+// Keyboard handlers:
+// 's' to select/deselect hovered card
+// 'z' to commit meld (create a suite with selected cards)
+// 'a' to add selected cards to an existing meld (must click on a meld first)
+// 'd' to discard the hovered card
 document.addEventListener('keydown', (ev) => {
-  if (ev.key === 'e' || ev.key === 'E') {
-    if (hoveredCard) {
+  // 's' to select/deselect hovered card (or last tapped on mobile)
+  if (ev.key === 's' || ev.key === 'S') {
+    const cardToSelect = hoveredCard || (isMobile ? lastTappedCard : null);
+    if (cardToSelect) {
       const cardEls = Array.from(document.querySelectorAll('#hand .card'));
-      const el = cardEls.find(x => x.textContent === hoveredCard);
+      const el = cardEls.find(x => x.textContent === cardToSelect);
       
-      if (currentMeld.includes(hoveredCard)) {
+      if (currentMeld.includes(cardToSelect)) {
         // Deselect if already selected
-        currentMeld = currentMeld.filter(c => c !== hoveredCard);
+        currentMeld = currentMeld.filter(c => c !== cardToSelect);
         if (el) el.classList.remove('selected');
       } else {
         // Select if not already selected
-        currentMeld.push(hoveredCard);
+        currentMeld.push(cardToSelect);
         if (el) el.classList.add('selected');
+      }
+      if (isMobile) {
+        updateMobileButtons();
       }
     }
   }
-  if (ev.key === 'r' || ev.key === 'R') {
-    // commit current meld while mouse is over a select card (hoveredCard may be target)
+  // 'z' to commit meld (create a suite with selected cards)
+  if (ev.key === 'z' || ev.key === 'Z') {
     if (currentMeld.length > 0) {
-      const target = hoveredCard || null;
+      const target = hoveredCard || (isMobile ? lastTappedCard : null);
       console.log('Attempting commitMeld payload:', { meld: currentMeld.slice(), targetCard: target });
       safeEmit('commitMeld', { meld: currentMeld.slice(), targetCard: target });
       // clear local selection; server will broadcast the committed meld
       currentMeld = [];
       // remove selected classes
       document.querySelectorAll('#hand .card.selected').forEach(el => el.classList.remove('selected'));
+      if (isMobile) {
+        lastTappedCard = null;
+        updateMobileButtons();
+      }
     }
   }
   // 'a' to add selected cards to a meld (must click on a meld first)
@@ -618,8 +745,32 @@ document.addEventListener('keydown', (ev) => {
       // remove selected classes
       document.querySelectorAll('#hand .card.selected').forEach(el => el.classList.remove('selected'));
       document.querySelectorAll('.meld.selected-meld').forEach(el => el.classList.remove('selected-meld'));
+      if (isMobile) {
+        lastTappedCard = null;
+        updateMobileButtons();
+      }
     } else if (currentMeld.length > 0) {
-      showToast('Sélectionnez d\'abord un meld en cliquant dessus', 'error', 3000);
+      showToast('Sélectionnez d\'abord un meld en cliquant/appuyant dessus', 'error', 3000);
+    }
+  }
+  // 'd' to discard the hovered card (or last tapped on mobile)
+  if (ev.key === 'd' || ev.key === 'D') {
+    const cardToDiscard = hoveredCard || (isMobile ? lastTappedCard : null);
+    if (cardToDiscard && isMyTurn) {
+      safeEmit("discardCard", cardToDiscard);
+      // Remove from selection if it was selected
+      currentMeld = currentMeld.filter(c => c !== cardToDiscard);
+      const cardEls = Array.from(document.querySelectorAll('#hand .card'));
+      const el = cardEls.find(x => x.textContent === cardToDiscard);
+      if (el) el.classList.remove('selected');
+      if (isMobile) {
+        lastTappedCard = null;
+        updateMobileButtons();
+      }
+    } else if (!isMyTurn) {
+      showToast('Patientez, ce n\'est pas encore votre tour.', 'info', 1500);
+    } else if (!cardToDiscard) {
+      showToast(isMobile ? 'Appuyez sur une carte pour la défausser' : 'Survolez une carte pour la défausser avec "D"', 'info', 2000);
     }
   }
 });
@@ -641,7 +792,15 @@ function showToast(text, type = 'error', ttl = 4000) {
   }, ttl);
 }
 
-// Bot controls
+// Helper function to enable all bot buttons (used when game ends)
+function enableBotButtons() {
+  if (addBotEasyBtn && !gameStarted) addBotEasyBtn.disabled = false;
+  if (addBotMediumBtn && !gameStarted) addBotMediumBtn.disabled = false;
+  if (addBotHardBtn && !gameStarted) addBotHardBtn.disabled = false;
+  if (addBotRealistBtn && !gameStarted) addBotRealistBtn.disabled = false;
+}
+
+// Bot controls - each click adds exactly one bot
 if (addBotEasyBtn) {
   addBotEasyBtn.onclick = () => {
     safeEmit('addBot', 'easy');
@@ -663,6 +822,14 @@ if (addBotHardBtn) {
 if (addBotRealistBtn) {
   addBotRealistBtn.onclick = () => {
     safeEmit('addBot', 'realist');
+  };
+}
+
+if (removeAllBotsBtn) {
+  removeAllBotsBtn.onclick = () => {
+    if (confirm('Êtes-vous sûr de vouloir supprimer tous les bots ?')) {
+      safeEmit('removeAllBots');
+    }
   };
 }
 
@@ -707,6 +874,13 @@ document.addEventListener('DOMContentLoaded', () => {
   if (addBotRealistBtn && !addBotRealistBtn.onclick) {
     addBotRealistBtn.onclick = () => safeEmit('addBot', 'realist');
   }
+  if (removeAllBotsBtn && !removeAllBotsBtn.onclick) {
+    removeAllBotsBtn.onclick = () => {
+      if (confirm('Êtes-vous sûr de vouloir supprimer tous les bots ?')) {
+        safeEmit('removeAllBots');
+      }
+    };
+  }
   if (startGameBtn && !startGameBtn.onclick) {
     startGameBtn.onclick = () => safeEmit('startGame');
   }
@@ -720,6 +894,55 @@ document.addEventListener('DOMContentLoaded', () => {
   
   ensureDrawButton();
   
+  // Help modal functionality
+  const helpBtn = document.getElementById('helpBtn');
+  const helpModal = document.getElementById('helpModal');
+  const modalClose = document.querySelector('.modal-close');
+  
+  if (helpBtn && helpModal) {
+    helpBtn.onclick = () => {
+      helpModal.classList.add('show');
+    };
+  }
+  
+  if (modalClose) {
+    modalClose.onclick = () => {
+      helpModal.classList.remove('show');
+    };
+  }
+  
+  // Close modal when clicking outside of it
+  if (helpModal) {
+    helpModal.onclick = (e) => {
+      if (e.target === helpModal) {
+        helpModal.classList.remove('show');
+      }
+    };
+  }
+  
+  // Close modal with Escape key
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && helpModal && helpModal.classList.contains('show')) {
+      helpModal.classList.remove('show');
+    }
+  });
+  
+  // Mobile action buttons
+  setupMobileActions();
+  
+  // Prevent clicks on buttons from deselecting cards (mobile)
+  if (isMobile) {
+    // Prevent event propagation from all buttons to avoid deselection
+    document.querySelectorAll('button').forEach(btn => {
+      btn.addEventListener('touchstart', (e) => {
+        e.stopPropagation();
+      });
+      btn.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
+    });
+  }
+  
   // Check if socket is connected, if not, show error
   if (!socket || !socket.connected) {
     console.warn('[DOMContentLoaded] Socket not connected yet, waiting...');
@@ -728,6 +951,146 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 });
+
+// Function to update mobile button states
+function updateMobileButtons() {
+  if (!isMobile) return;
+  
+  const mobileSelectBtn = document.getElementById('mobileSelectBtn');
+  const mobileMeldBtn = document.getElementById('mobileMeldBtn');
+  const mobileAddToMeldBtn = document.getElementById('mobileAddToMeldBtn');
+  const mobileDiscardBtn = document.getElementById('mobileDiscardBtn');
+  
+  // Buttons might not exist yet, so check
+  if (!mobileMeldBtn && !mobileAddToMeldBtn && !mobileDiscardBtn) return;
+  
+  if (mobileSelectBtn) {
+    mobileSelectBtn.disabled = !isMyTurn || !lastTappedCard;
+  }
+  
+  if (mobileMeldBtn) {
+    mobileMeldBtn.disabled = !isMyTurn || currentMeld.length === 0;
+  }
+  
+  if (mobileAddToMeldBtn) {
+    mobileAddToMeldBtn.disabled = !isMyTurn || currentMeld.length === 0 || window.selectedMeldIndex === undefined;
+  }
+  
+  if (mobileDiscardBtn) {
+    mobileDiscardBtn.disabled = !isMyTurn || !lastTappedCard;
+  }
+}
+
+// Setup mobile action buttons
+function setupMobileActions() {
+  if (!isMobile) return;
+  
+  const mobileSelectBtn = document.getElementById('mobileSelectBtn');
+  const mobileMeldBtn = document.getElementById('mobileMeldBtn');
+  const mobileAddToMeldBtn = document.getElementById('mobileAddToMeldBtn');
+  const mobileDiscardBtn = document.getElementById('mobileDiscardBtn');
+  
+  // Select button: add last tapped card to selection for meld
+  if (mobileSelectBtn) {
+    mobileSelectBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (lastTappedCard) {
+        const cardEls = Array.from(document.querySelectorAll('#hand .card'));
+        const el = cardEls.find(x => x.textContent === lastTappedCard);
+        
+        if (currentMeld.includes(lastTappedCard)) {
+          // Deselect if already selected
+          currentMeld = currentMeld.filter(c => c !== lastTappedCard);
+          if (el) el.classList.remove('selected');
+        } else {
+          // Select for meld
+          currentMeld.push(lastTappedCard);
+          if (el) el.classList.add('selected');
+        }
+        updateMobileButtons();
+      } else {
+        showToast('Appuyez sur une carte d\'abord', 'info', 2000);
+      }
+    };
+  }
+  
+  // Create meld button
+  if (mobileMeldBtn) {
+    mobileMeldBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (currentMeld.length > 0 && isMyTurn) {
+        const target = lastTappedCard || null;
+        safeEmit('commitMeld', { meld: currentMeld.slice(), targetCard: target });
+        currentMeld = [];
+        document.querySelectorAll('#hand .card.selected').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('#hand .card.target').forEach(el => el.classList.remove('target'));
+        lastTappedCard = null;
+        updateMobileButtons();
+      }
+    };
+  }
+  
+  // Add to meld button
+  if (mobileAddToMeldBtn) {
+    mobileAddToMeldBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (currentMeld.length > 0 && window.selectedMeldIndex !== undefined && isMyTurn) {
+        safeEmit('addToMeld', { meldIndex: window.selectedMeldIndex, cards: currentMeld.slice() });
+  currentMeld = [];
+  window.selectedMeldIndex = undefined;
+        document.querySelectorAll('#hand .card.selected').forEach(el => el.classList.remove('selected'));
+        document.querySelectorAll('#hand .card.target').forEach(el => el.classList.remove('target'));
+        document.querySelectorAll('.meld.selected-meld').forEach(el => el.classList.remove('selected-meld'));
+        lastTappedCard = null;
+        updateMobileButtons();
+      } else if (currentMeld.length > 0) {
+        showToast('Sélectionnez d\'abord un meld en appuyant dessus', 'error', 3000);
+      }
+    };
+  }
+  
+  // Discard button
+  if (mobileDiscardBtn) {
+    mobileDiscardBtn.onclick = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (isMyTurn) {
+        let cardToDiscard = null;
+        if (lastTappedCard) {
+          cardToDiscard = lastTappedCard;
+        } else if (currentMeld.length > 0) {
+          // Discard the last selected card
+          cardToDiscard = currentMeld[currentMeld.length - 1];
+        }
+        
+        if (cardToDiscard) {
+          safeEmit("discardCard", cardToDiscard);
+          // Remove from selection if it was selected
+          currentMeld = currentMeld.filter(c => c !== cardToDiscard);
+          const cardEls = Array.from(document.querySelectorAll('#hand .card'));
+          const el = cardEls.find(x => x.textContent === cardToDiscard);
+          if (el) {
+            el.classList.remove('selected');
+            el.classList.remove('target');
+          }
+          lastTappedCard = null;
+          updateMobileButtons();
+        } else {
+          showToast('Appuyez sur une carte puis sur "Défausser"', 'info', 2000);
+        }
+      } else {
+        showToast('Patientez, ce n\'est pas encore votre tour.', 'info', 1500);
+      }
+    };
+  }
+  
+  // Update buttons on turn change
+  const originalTurnStart = socket?.on;
+  // This will be handled in the turnStart event listener
+}
 
 // Debug: Verify all elements are found (also log immediately)
 console.log('[Debug] Elements check (immediate):', {

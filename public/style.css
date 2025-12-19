@@ -64,6 +64,19 @@ h1 {
   transform: translateY(-5px);
 }
 
+.card.target {
+  border-color: #4CAF50;
+  border-width: 3px;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+}
+
+.card.selected.target {
+  background: #ffffcc;
+  border-color: #4CAF50;
+  border-width: 3px;
+  box-shadow: 0 0 10px rgba(76, 175, 80, 0.6);
+}
+
 .card.hovered {
   border-color: #4CAF50;
 }
@@ -165,7 +178,15 @@ h1 {
 
 .card-back {
   font-size: 80px;
-  color: #3498db;
+  color: #717c83;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: "Apple Color Emoji", "Segoe UI Emoji", "Noto Color Emoji", "Android Emoji", "EmojiSymbols", "EmojiOne Mozilla", "Twemoji Mozilla", "Segoe UI Symbol", sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 #melds {
@@ -327,4 +348,376 @@ h1 {
   text-align: center;
   font-style: italic;
   margin: 20px 0;
+}
+
+/* Help Button */
+.help-btn {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #2196F3;
+  color: white;
+  border: none;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+}
+
+.help-btn:hover {
+  background: #1976D2;
+  transform: scale(1.1);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+
+/* Modal */
+.modal {
+  display: none;
+  position: fixed;
+  z-index: 2000;
+  left: 0;
+  top: 0;
+  width: 100%;
+  height: 100%;
+  overflow: auto;
+  background-color: rgba(0,0,0,0.7);
+  animation: fadeIn 0.3s;
+}
+
+.modal.show {
+  display: block;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.modal-content {
+  background-color: #2d5a3d;
+  margin: 5% auto;
+  padding: 0;
+  border: 2px solid #ffd966;
+  border-radius: 10px;
+  width: 90%;
+  max-width: 800px;
+  max-height: 85vh;
+  overflow-y: auto;
+  box-shadow: 0 8px 16px rgba(0,0,0,0.5);
+  animation: slideDown 0.3s;
+}
+
+@keyframes slideDown {
+  from {
+    transform: translateY(-50px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.modal-close {
+  color: #ffd966;
+  float: right;
+  font-size: 32px;
+  font-weight: bold;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.modal-close:hover,
+.modal-close:focus {
+  color: #fff;
+  text-decoration: none;
+}
+
+.modal-body {
+  padding: 20px 40px 40px 40px;
+  color: #fff;
+  line-height: 1.6;
+}
+
+.modal-body h2 {
+  color: #ffd966;
+  margin-top: 20px;
+  margin-bottom: 15px;
+  text-shadow: 1px 1px 2px rgba(0,0,0,0.5);
+}
+
+.modal-body h2:first-child {
+  margin-top: 0;
+}
+
+.modal-body h3 {
+  color: #4CAF50;
+  margin-top: 20px;
+  margin-bottom: 10px;
+}
+
+.modal-body p {
+  margin: 10px 0;
+}
+
+.modal-body ul {
+  margin: 10px 0;
+  padding-left: 30px;
+}
+
+.modal-body li {
+  margin: 8px 0;
+}
+
+.modal-body hr {
+  border: none;
+  border-top: 1px solid #4CAF50;
+  margin: 20px 0;
+}
+
+.modal-body strong {
+  color: #ffd966;
+}
+
+.modal-body em {
+  color: #999;
+  font-size: 0.9em;
+}
+
+/* Mobile Actions Bar */
+.mobile-actions {
+  display: none;
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.9);
+  padding: 10px;
+  z-index: 150;
+  box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.5);
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+}
+
+.mobile-action-btn {
+  flex: 1;
+  min-width: 90px;
+  padding: 10px 8px;
+  background: #4CAF50;
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 12px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.2s;
+  touch-action: manipulation;
+  text-align: center;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.mobile-action-btn:active {
+  background: #45a049;
+  transform: scale(0.95);
+}
+
+.mobile-action-btn:disabled {
+  background: #666;
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+  body {
+    padding: 10px;
+    padding-bottom: 200px; /* Space for hand + mobile actions */
+  }
+
+  h1 {
+    font-size: 24px;
+    margin: 10px 0;
+  }
+
+  /* Show mobile actions on mobile */
+  .mobile-actions {
+    display: flex;
+  }
+
+  /* Adjust hand position for mobile */
+  #hand {
+    position: fixed;
+    bottom: 80px; /* Above mobile actions */
+    left: 10px;
+    right: 10px;
+    max-width: 100%;
+    padding: 10px;
+    min-height: 120px;
+    transform: none;
+    margin: 0;
+  }
+
+  .card {
+    min-width: 50px;
+    height: 70px;
+    font-size: 18px;
+    touch-action: manipulation;
+  }
+
+  #drawBtn {
+    padding: 10px 20px;
+    font-size: 16px;
+    min-width: 100px;
+  }
+
+  /* Stack game area vertically on mobile */
+  #gameArea {
+    grid-template-columns: 1fr;
+    gap: 15px;
+    margin: 10px auto;
+    padding: 10px;
+  }
+
+  .pile-container {
+    width: 100%;
+  }
+
+  .pile {
+    min-height: 120px;
+  }
+
+  #melds {
+    min-height: 300px;
+  }
+
+  /* Make control buttons stack better */
+  #gameControls {
+    margin: 10px auto;
+  }
+
+  #gameControls > div {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 5px;
+  }
+
+  .control-btn {
+    padding: 10px 16px;
+    font-size: 13px;
+    margin: 3px;
+    flex: 1;
+    min-width: 120px;
+    touch-action: manipulation;
+  }
+
+  .bot-btn {
+    min-width: 140px;
+  }
+
+  #turnIndicator {
+    font-size: 16px;
+    padding: 8px;
+    width: 100%;
+    text-align: center;
+  }
+
+  /* Help button adjustments */
+  .help-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    top: 10px;
+    right: 10px;
+  }
+
+  /* Mobile action buttons adjustments */
+  .mobile-actions {
+    gap: 6px;
+    padding: 8px;
+  }
+  
+  .mobile-action-btn {
+    font-size: 11px;
+    padding: 8px 4px;
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  /* Modal adjustments */
+  .modal-content {
+    width: 95%;
+    margin: 10% auto;
+    max-height: 80vh;
+  }
+
+  .modal-body {
+    padding: 15px 20px 30px 20px;
+    font-size: 14px;
+  }
+
+  .modal-body h2 {
+    font-size: 18px;
+  }
+
+  .modal-body h3 {
+    font-size: 16px;
+  }
+
+  /* Toast adjustments */
+  #toasts {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    max-width: calc(100% - 20px);
+  }
+
+  .toast {
+    max-width: 100%;
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  #handInfo {
+    position: fixed;
+    bottom: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 14px;
+    background: rgba(0, 0, 0, 0.5);
+    padding: 5px 15px;
+    border-radius: 15px;
+  }
+}
+
+/* Tablet adjustments */
+@media (min-width: 769px) and (max-width: 1024px) {
+  #hand {
+    max-width: 90%;
+  }
+
+  .card {
+    min-width: 55px;
+    height: 78px;
+  }
+
+  #gameArea {
+    grid-template-columns: 1fr 2fr 1fr;
+    gap: 15px;
+  }
 }

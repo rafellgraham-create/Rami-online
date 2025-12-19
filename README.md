@@ -95,9 +95,10 @@ wuii/
 
 ## Keyboard Shortcuts
 
-- `E` - Add hovered card to current meld
-- `R` - Commit current meld
-- `A` - Add selected cards to existing meld
+- `S` - Select/deselect the hovered card
+- `Z` - Create a meld (suite) with selected cards
+- `A` - Add selected cards to an existing meld (must click on a meld first)
+- `D` - Discard the hovered card
 
 ## Technologies
 
