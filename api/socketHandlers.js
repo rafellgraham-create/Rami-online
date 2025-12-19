@@ -434,7 +434,11 @@ module.exports = (io) => {
     socket.on("disconnect", () => {
       console.log("Déconnexion :", socket.id);
       const wasInGame = gameState.gameStarted && gameState.playerOrder.includes(socket.id);
-      const playerName = players[socket.id]?.isBot ? `Bot ${socket.id}` : `Joueur ${socket.id}`;
+      // Get player name BEFORE deleting from players object
+      const playerName = players[socket.id]?.name || 
+                        (players[socket.id]?.isBot ? 
+                         `Bot_${socket.id}` : 
+                         `Joueur ${socket.id.substring(0, 8)}`);
       
       delete players[socket.id];
       
