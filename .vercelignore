@@ -1,0 +1,11 @@
+.git
+.next
+node_modules
+*.md
+.gitignore
+tsconfig.json
+next.config.ts
+next-env.d.ts
+eslint.config.mjs
+postcss.config.mjs
+src/
