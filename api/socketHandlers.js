@@ -17,7 +17,7 @@ module.exports = (io) => {
     console.log("Nouveau joueur connecté :", socket.id);
 
     // Add player
-    players[socket.id] = { hand: [], isBot: false };
+    players[socket.id] = { hand: [], isBot: false, name: `Joueur ${socket.id.substring(0, 8)}` };
 
     // Start with empty hand; cards are dealt when the game starts
     players[socket.id].hand = [];
@@ -31,6 +31,38 @@ module.exports = (io) => {
       gameStarted: gameState.gameStarted,
       currentPlayer: gameState.currentPlayer,
       playerOrder: gameState.playerOrder
+    });
+    
+    // Notify if a game is in progress
+    if (gameState.gameStarted) {
+      const currentPlayerName = players[gameState.currentPlayer]?.name || 
+                                (players[gameState.currentPlayer]?.isBot ? 
+                                 `Bot ${gameState.currentPlayer}` : 
+                                 `Joueur ${gameState.currentPlayer.substring(0, 8)}`);
+      socket.emit("gameInProgress", {
+        message: "Une partie est déjà en cours.",
+        currentPlayer: currentPlayerName,
+        playerCount: gameState.playerOrder.length
+      });
+    }
+
+    // Set player name
+    socket.on("setPlayerName", (name) => {
+      if (name && typeof name === 'string' && name.trim().length > 0) {
+        const trimmedName = name.trim().substring(0, 20);
+        players[socket.id].name = trimmedName;
+        console.log(`Joueur ${socket.id} a défini son nom: ${trimmedName}`);
+        io.emit("playerNameUpdated", { playerId: socket.id, name: trimmedName });
+      }
+    });
+    
+    // Request all player names (for updating meld displays)
+    socket.on("requestPlayerNames", () => {
+      Object.keys(players).forEach(playerId => {
+        if (players[playerId].name) {
+          socket.emit("playerNameUpdated", { playerId, name: players[playerId].name });
+        }
+      });
     });
 
     // Add bot
@@ -91,6 +123,12 @@ module.exports = (io) => {
     socket.on("stopGame", () => {
       console.log("Arrêt de la partie");
       
+      // Clear timer
+      if (gameState.turnTimer) {
+        clearTimeout(gameState.turnTimer);
+        gameState.turnTimer = null;
+      }
+      
       // Reset game state
       gameState.gameStarted = false;
       gameState.currentPlayer = null;
@@ -127,6 +165,13 @@ module.exports = (io) => {
         socket.emit('commitFailed', { message: 'Vous avez déjà pioché cette manche.' });
         return;
       }
+      
+      // Clear timer on action
+      if (gameState.turnTimer) {
+        clearTimeout(gameState.turnTimer);
+        gameState.turnTimer = null;
+      }
+      
       console.log("Le joueur", socket.id, "pioche une carte");
       if (deck.length === 0) {
         console.warn("Deck vide, réinitialisation...");
@@ -167,6 +212,13 @@ module.exports = (io) => {
         socket.emit('commitFailed', { message: 'Vous avez déjà pioché cette manche.' });
         return;
       }
+      
+      // Clear timer on action
+      if (gameState.turnTimer) {
+        clearTimeout(gameState.turnTimer);
+        gameState.turnTimer = null;
+      }
+      
       console.log("Le joueur", socket.id, "pioche dans la défausse");
       if (discardPile.length === 0) {
         socket.emit('commitFailed', { message: 'La défausse est vide.' });
@@ -196,10 +248,16 @@ module.exports = (io) => {
       io.emit("discardPileUpdate", discardPile);
       socket.emit("updateHand", players[socket.id].hand);
       
+      // Clear timer on action
+      if (gameState.turnTimer) {
+        clearTimeout(gameState.turnTimer);
+        gameState.turnTimer = null;
+      }
+      
       // Check for win condition
       if (players[socket.id].hand.length === 0) {
         const isBot = players[socket.id].isBot;
-        const winnerName = isBot ? `Bot ${socket.id}` : `Joueur ${socket.id}`;
+        const winnerName = players[socket.id].name || (isBot ? `Bot ${socket.id}` : `Joueur ${socket.id}`);
         console.log(`${winnerName} a gagné!`);
         
         io.emit("gameWon", { 
@@ -241,6 +299,12 @@ module.exports = (io) => {
         return;
       }
       
+      // Clear timer on action
+      if (gameState.turnTimer) {
+        clearTimeout(gameState.turnTimer);
+        gameState.turnTimer = null;
+      }
+      
       players[socket.id].hand = hand.filter(c => !meld.includes(c));
       const committed = { player: socket.id, meld, targetCard };
       committedMelds.push(committed);
@@ -249,7 +313,7 @@ module.exports = (io) => {
       
       if (players[socket.id].hand.length === 0) {
         const winner = socket.id;
-        const winnerName = players[socket.id].isBot ? winner : 'Vous';
+        const winnerName = players[socket.id].name || (players[socket.id].isBot ? `Bot ${socket.id}` : 'Vous');
         const isBot = players[socket.id].isBot;
         
         io.emit("gameWon", { winner, winnerName, isBot });
@@ -294,6 +358,12 @@ module.exports = (io) => {
         return;
       }
 
+      // Clear timer on action
+      if (gameState.turnTimer) {
+        clearTimeout(gameState.turnTimer);
+        gameState.turnTimer = null;
+      }
+      
       committedMelds[meldIndex].meld = newMeld;
       players[socket.id].hand = hand.filter(c => !cards.includes(c));
       
@@ -302,7 +372,7 @@ module.exports = (io) => {
       
       if (players[socket.id].hand.length === 0) {
         const winner = socket.id;
-        const winnerName = players[socket.id].isBot ? winner : 'Vous';
+        const winnerName = players[socket.id].name || (players[socket.id].isBot ? `Bot ${socket.id}` : 'Vous');
         const isBot = players[socket.id].isBot;
         
         io.emit("gameWon", { winner, winnerName, isBot });
@@ -320,14 +390,47 @@ module.exports = (io) => {
 
     socket.on("disconnect", () => {
       console.log("Déconnexion :", socket.id);
+      const wasInGame = gameState.gameStarted && gameState.playerOrder.includes(socket.id);
+      const playerName = players[socket.id]?.isBot ? `Bot ${socket.id}` : `Joueur ${socket.id}`;
+      
       delete players[socket.id];
       
       const index = gameState.playerOrder.indexOf(socket.id);
       if (index > -1) {
         gameState.playerOrder.splice(index, 1);
-        if (gameState.playerOrder.length === 0) {
-          gameState.gameStarted = false;
-        }
+      }
+      
+      // If a player disconnected during an active game, stop the game
+      if (wasInGame && gameState.gameStarted) {
+        console.log(`Partie arrêtée car ${playerName} a quitté la partie`);
+        
+        // Reset game state
+        gameState.gameStarted = false;
+        gameState.currentPlayer = null;
+        gameState.hasDrawn = false;
+        gameState.turnIndex = 0;
+        committedMelds.length = 0;
+        discardPile.length = 0;
+        initDeck();
+        
+        // Clear all player hands and redistribute
+        Object.keys(players).forEach(playerId => {
+          if (deck.length < 13) initDeck();
+          players[playerId].hand = deck.splice(0, 13);
+          if (players[playerId].isBot) {
+            const bot = bots[playerId];
+            if (bot) bot.hand = players[playerId].hand;
+          } else {
+            io.to(playerId).emit("initHand", players[playerId].hand);
+          }
+        });
+        
+        // Broadcast game stopped due to disconnection
+        io.emit("gameStopped", { reason: "playerDisconnected", playerName });
+        io.emit("discardPileUpdate", discardPile);
+      } else if (gameState.playerOrder.length === 0) {
+        // No players left, stop game
+        gameState.gameStarted = false;
       }
     });
   });

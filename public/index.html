@@ -72,6 +72,20 @@
   <!-- Toasts for errors / notifications -->
   <div id="toasts" aria-live="polite" aria-atomic="true"></div>
 
+  <!-- Welcome Modal -->
+  <div id="welcomeModal" class="modal show">
+    <div class="modal-content welcome-modal">
+      <h2 style="text-align: center; color: #ffd966; margin-bottom: 20px;">Bienvenue!</h2>
+      <div class="welcome-gif">
+        <iframe src="https://tenor.com/embed/12184033" width="420" height="314" frameBorder="0" class="tenor-gif-embed" allowFullScreen style="max-width: 100%;"></iframe>
+      </div>
+      <div class="welcome-form">
+        <input type="text" id="playerNameInput" placeholder="Quel sera votre nom ?" maxlength="20" autocomplete="off">
+        <button id="enterGameBtn" class="control-btn">Entrer</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Help Modal -->
   <div id="helpModal" class="modal">
     <div class="modal-content">
@@ -114,7 +128,6 @@
         </ul>
 
         <p>Glisser avec son doigt la barre de carte vers la droite pour voir les autres cartes et piocher</p>
-        <p>Glisser la table de jeu de haut en bas pour voir les autres suites si necéssaire</p>
         
         <hr>
         

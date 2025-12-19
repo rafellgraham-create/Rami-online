@@ -9,7 +9,8 @@ let gameState = {
   playerOrder: [],
   turnIndex: 0,
   gameStarted: false,
-  hasDrawn: false
+  hasDrawn: false,
+  turnTimer: null // Timer for turn timeout (60 seconds)
 };
 
 // Bot class
@@ -338,6 +339,12 @@ function isValidRun(meld) {
 function nextTurn(io) {
   if (!gameState.gameStarted || gameState.playerOrder.length === 0) return;
   
+  // Clear existing timer
+  if (gameState.turnTimer) {
+    clearTimeout(gameState.turnTimer);
+    gameState.turnTimer = null;
+  }
+  
   gameState.turnIndex = (gameState.turnIndex + 1) % gameState.playerOrder.length;
   gameState.currentPlayer = gameState.playerOrder[gameState.turnIndex];
   gameState.hasDrawn = false;
@@ -347,11 +354,53 @@ function nextTurn(io) {
   if (players[gameState.currentPlayer]?.isBot) {
     const bot = bots[gameState.currentPlayer];
     setTimeout(() => bot.takeTurn(), 1000);
+  } else {
+    // Start 60 second timer for human player
+    gameState.turnTimer = setTimeout(() => {
+      const playerName = players[gameState.currentPlayer]?.name || `Joueur ${gameState.currentPlayer}`;
+      console.log(`Timer expiré pour ${playerName} (${gameState.currentPlayer})`);
+      
+      // Stop the game due to inactivity
+      gameState.gameStarted = false;
+      gameState.currentPlayer = null;
+      gameState.hasDrawn = false;
+      gameState.turnIndex = 0;
+      committedMelds.length = 0;
+      discardPile.length = 0;
+      initDeck();
+      
+      // Clear all player hands and redistribute
+      Object.keys(players).forEach(playerId => {
+        if (deck.length < 13) initDeck();
+        players[playerId].hand = deck.splice(0, 13);
+        if (players[playerId].isBot) {
+          const bot = bots[playerId];
+          if (bot) bot.hand = players[playerId].hand;
+        } else {
+          io.to(playerId).emit("initHand", players[playerId].hand);
+        }
+      });
+      
+      // Broadcast game stopped due to timeout
+      io.emit("gameStopped", { reason: "timeout", playerName });
+      io.emit("discardPileUpdate", discardPile);
+      
+      if (gameState.turnTimer) {
+        clearTimeout(gameState.turnTimer);
+        gameState.turnTimer = null;
+      }
+    }, 60000); // 60 seconds
   }
 }
 
 function startGame(io) {
   if (gameState.gameStarted) return;
+  
+  // Clear any existing timer
+  if (gameState.turnTimer) {
+    clearTimeout(gameState.turnTimer);
+    gameState.turnTimer = null;
+  }
   
   gameState.playerOrder = Object.keys(players);
   if (gameState.playerOrder.length === 0) return;
@@ -381,6 +430,42 @@ function startGame(io) {
   if (players[gameState.currentPlayer]?.isBot) {
     const bot = bots[gameState.currentPlayer];
     setTimeout(() => bot.takeTurn(), 1000);
+  } else {
+    // Start 60 second timer for human player
+    gameState.turnTimer = setTimeout(() => {
+      const playerName = players[gameState.currentPlayer]?.name || `Joueur ${gameState.currentPlayer}`;
+      console.log(`Timer expiré pour ${playerName} (${gameState.currentPlayer})`);
+      
+      // Stop the game due to inactivity
+      gameState.gameStarted = false;
+      gameState.currentPlayer = null;
+      gameState.hasDrawn = false;
+      gameState.turnIndex = 0;
+      committedMelds.length = 0;
+      discardPile.length = 0;
+      initDeck();
+      
+      // Clear all player hands and redistribute
+      Object.keys(players).forEach(playerId => {
+        if (deck.length < 13) initDeck();
+        players[playerId].hand = deck.splice(0, 13);
+        if (players[playerId].isBot) {
+          const bot = bots[playerId];
+          if (bot) bot.hand = players[playerId].hand;
+        } else {
+          io.to(playerId).emit("initHand", players[playerId].hand);
+        }
+      });
+      
+      // Broadcast game stopped due to timeout
+      io.emit("gameStopped", { reason: "timeout", playerName });
+      io.emit("discardPileUpdate", discardPile);
+      
+      if (gameState.turnTimer) {
+        clearTimeout(gameState.turnTimer);
+        gameState.turnTimer = null;
+      }
+    }, 60000); // 60 seconds
   }
 }
 

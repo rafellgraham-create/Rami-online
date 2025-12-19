@@ -493,6 +493,85 @@ h1 {
   font-size: 0.9em;
 }
 
+/* Welcome Modal Styles */
+.welcome-modal {
+  text-align: center;
+  padding: 30px;
+}
+
+.welcome-modal h2 {
+  margin-top: 0;
+  margin-bottom: 20px;
+}
+
+.welcome-gif {
+  margin: 20px 0;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.welcome-gif img,
+.welcome-gif iframe {
+  max-width: 100%;
+  max-height: 300px;
+  height: auto;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  display: block;
+  margin: 0 auto;
+}
+
+.welcome-gif iframe {
+  width: 420px;
+  height: 314px;
+  border: none;
+}
+
+@media (max-width: 768px) {
+  .welcome-gif iframe {
+    width: 100%;
+    max-width: 420px;
+    height: auto;
+    aspect-ratio: 420 / 314;
+  }
+}
+
+.welcome-form {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  margin-top: 20px;
+  max-width: 400px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.welcome-form input {
+  padding: 12px 16px;
+  font-size: 16px;
+  border: 2px solid #4CAF50;
+  border-radius: 8px;
+  background: rgba(255,255,255,0.1);
+  color: #fff;
+  text-align: center;
+}
+
+.welcome-form input::placeholder {
+  color: #999;
+}
+
+.welcome-form input:focus {
+  outline: none;
+  border-color: #ffd966;
+  background: rgba(255,255,255,0.15);
+}
+
+.welcome-form button {
+  padding: 12px 24px;
+  font-size: 16px;
+}
+
 /* Mobile Actions Bar */
 .mobile-actions {
   display: none;

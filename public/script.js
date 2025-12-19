@@ -35,6 +35,17 @@ function initSocket() {
     // Debug connection
     socket.on('connect', () => {
       console.log('[Socket] ✅ Connected:', socket.id);
+      // Show welcome modal on reconnection (no pre-filling)
+      if (welcomeModal && !welcomeModal.classList.contains('show')) {
+        welcomeModal.classList.add('show');
+        if (playerNameInput) {
+          playerNameInput.value = ''; // Clear input
+        }
+      }
+      // Send player name when connected (only if modal is closed)
+      if (playerName && welcomeModal && !welcomeModal.classList.contains('show')) {
+        safeEmit('setPlayerName', playerName);
+      }
     });
 
     socket.on('disconnect', (reason) => {
@@ -148,6 +159,21 @@ function attachSocketListeners() {
     // data: { player, meld, targetCard }
     melds.push(data);
     renderMelds();
+    // Request player names for all melds
+    if (socket && socket.connected) {
+      safeEmit('requestPlayerNames');
+    }
+  });
+  
+  socket.on('playerNameUpdated', ({ playerId, name }) => {
+    // Update meld owner names
+    document.querySelectorAll(`.meld-owner[data-player-id="${playerId}"]`).forEach(el => {
+      if (playerId === socket.id) {
+        el.textContent = 'Vous';
+      } else {
+        el.textContent = name;
+      }
+    });
   });
 
   socket.on('meldUpdated', ({ meldIndex, newMeld, addedBy }) => {
@@ -183,6 +209,17 @@ function attachSocketListeners() {
     if (started && addBotMediumBtn) addBotMediumBtn.disabled = true;
     if (started && addBotHardBtn) addBotHardBtn.disabled = true;
     if (started && addBotRealistBtn) addBotRealistBtn.disabled = true;
+  });
+
+  socket.on('gameInProgress', ({ message, currentPlayer, playerCount }) => {
+    const fullMessage = `${message} ${playerCount} joueur(s) participent. Tour de ${currentPlayer}.`;
+    showToast(fullMessage, 'info', 6000);
+    
+    // Also update the turn indicator if it exists
+    if (turnIndicator) {
+      turnIndicator.textContent = `Partie en cours - Tour de ${currentPlayer}`;
+      turnIndicator.className = '';
+    }
   });
 
   socket.on('turnStart', ({ player }) => {
@@ -268,8 +305,25 @@ function attachSocketListeners() {
     }
   });
 
-  socket.on('gameStopped', () => {
-    showToast('La partie a été arrêtée', 'info', 3000);
+  socket.on('playerNameUpdated', ({ playerId, name }) => {
+    // Update meld owner names
+    document.querySelectorAll(`.meld-owner[data-player-id="${playerId}"]`).forEach(el => {
+      if (playerId === socket.id) {
+        el.textContent = 'Vous';
+      } else {
+        el.textContent = name;
+      }
+    });
+  });
+
+  socket.on('gameStopped', (data) => {
+    let message = 'La partie a été arrêtée';
+    if (data && data.reason === 'playerDisconnected') {
+      message = `La partie a été arrêtée car ${data.playerName || 'un joueur'} a quitté la partie`;
+    } else if (data && data.reason === 'timeout') {
+      message = `La partie a été arrêtée car ${data.playerName || 'un joueur'} n'a pas joué dans les 60 secondes`;
+    }
+    showToast(message, 'info', 4000);
     
     // Reset UI state
     gameStarted = false;
@@ -322,6 +376,12 @@ const startGameBtn = document.getElementById("startGameBtn");
 const stopGameBtn = document.getElementById("stopGameBtn");
 const turnIndicator = document.getElementById("turnIndicator");
 const handCountSpan = document.getElementById("handCount");
+const welcomeModal = document.getElementById("welcomeModal");
+const playerNameInput = document.getElementById("playerNameInput");
+const enterGameBtn = document.getElementById("enterGameBtn");
+
+// Player name (not stored, must be entered each time)
+let playerName = '';
 
 // meld state on client
 let currentMeld = [];
@@ -943,11 +1003,47 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
   
+  // Welcome modal handling - always show on page load/reconnection
+  if (welcomeModal && playerNameInput && enterGameBtn) {
+    // Always show welcome modal (no pre-filling)
+    welcomeModal.classList.add('show');
+    playerNameInput.value = ''; // Clear input
+    
+    // Handle Enter button click
+    enterGameBtn.onclick = () => {
+      const name = playerNameInput.value.trim();
+      if (name.length === 0) {
+        showToast('Veuillez entrer un nom', 'error', 2000);
+        return;
+      }
+      if (name.length > 20) {
+        showToast('Le nom ne peut pas dépasser 20 caractères', 'error', 2000);
+        return;
+      }
+      playerName = name;
+      welcomeModal.classList.remove('show');
+      if (socket && socket.connected) {
+        safeEmit('setPlayerName', playerName);
+      }
+    };
+    
+    // Handle Enter key in input
+    playerNameInput.addEventListener('keypress', (e) => {
+      if (e.key === 'Enter') {
+        enterGameBtn.click();
+      }
+    });
+  }
+  
   // Check if socket is connected, if not, show error
   if (!socket || !socket.connected) {
     console.warn('[DOMContentLoaded] Socket not connected yet, waiting...');
     socket.once('connect', () => {
       console.log('[DOMContentLoaded] Socket connected after DOM ready');
+      // Send player name when connected
+      if (playerName) {
+        safeEmit('setPlayerName', playerName);
+      }
     });
   }
 });
