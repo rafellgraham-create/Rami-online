@@ -33,11 +33,20 @@ module.exports = (io) => {
       playerOrder: gameState.playerOrder
     });
     
+    // Send players list
+    const playersList = Object.keys(players).map(playerId => ({
+      id: playerId,
+      name: players[playerId].name || (players[playerId].isBot ? `Bot_${playerId}` : `Joueur ${playerId.substring(0, 8)}`),
+      isBot: players[playerId].isBot || false,
+      handSize: players[playerId].hand?.length || 0
+    }));
+    socket.emit("playersListUpdate", playersList);
+    
     // Notify if a game is in progress
     if (gameState.gameStarted) {
       const currentPlayerName = players[gameState.currentPlayer]?.name || 
                                 (players[gameState.currentPlayer]?.isBot ? 
-                                 `Bot ${gameState.currentPlayer}` : 
+                                 `Bot_${gameState.currentPlayer}` : 
                                  `Joueur ${gameState.currentPlayer.substring(0, 8)}`);
       socket.emit("gameInProgress", {
         message: "Une partie est déjà en cours.",
@@ -53,6 +62,15 @@ module.exports = (io) => {
         players[socket.id].name = trimmedName;
         console.log(`Joueur ${socket.id} a défini son nom: ${trimmedName}`);
         io.emit("playerNameUpdated", { playerId: socket.id, name: trimmedName });
+        
+        // Update players list
+        const playersList = Object.keys(players).map(playerId => ({
+          id: playerId,
+          name: players[playerId].name || (players[playerId].isBot ? `Bot_${playerId}` : `Joueur ${playerId.substring(0, 8)}`),
+          isBot: players[playerId].isBot || false,
+          handSize: players[playerId].hand?.length || 0
+        }));
+        io.emit("playersListUpdate", playersList);
       }
     });
     
@@ -79,7 +97,13 @@ module.exports = (io) => {
                             difficulty === 'realist' ? 'Réaliste' : 'Moyen';
       const bot = new RamiBot(botId, io, difficulty);
       bots[botId] = bot;
-      players[botId] = { hand: [], isBot: true, botDifficulty: difficulty, botName: `Bot (${difficultyName})` };
+      players[botId] = { 
+        hand: [], 
+        isBot: true, 
+        botDifficulty: difficulty, 
+        botName: `Bot (${difficultyName})`,
+        name: `Bot_${botId}` // Set bot name as "Bot_" + ID
+      };
       
       // Deal cards to bot
       if (deck.length < 13) initDeck();
@@ -88,6 +112,15 @@ module.exports = (io) => {
       
       io.emit("playerJoined", { id: botId, isBot: true, playerCount: Object.keys(players).length, botDifficulty: difficulty, botName: `Bot (${difficultyName})` });
       console.log(`Bot ajouté (${difficultyName}):`, botId);
+      
+      // Update players list
+      const playersList = Object.keys(players).map(playerId => ({
+        id: playerId,
+        name: players[playerId].name || (players[playerId].isBot ? `Bot_${playerId}` : `Joueur ${playerId.substring(0, 8)}`),
+        isBot: players[playerId].isBot || false,
+        handSize: players[playerId].hand?.length || 0
+      }));
+      io.emit("playersListUpdate", playersList);
     });
 
     // Remove all bots
@@ -111,6 +144,15 @@ module.exports = (io) => {
       
       console.log(`${removedCount} bot(s) supprimé(s)`);
       io.emit("allBotsRemoved", { removedCount, playerCount: Object.keys(players).length });
+      
+      // Update players list
+      const playersList = Object.keys(players).map(playerId => ({
+        id: playerId,
+        name: players[playerId].name || (players[playerId].isBot ? `Bot_${playerId}` : `Joueur ${playerId.substring(0, 8)}`),
+        isBot: players[playerId].isBot || false,
+        handSize: players[playerId].hand?.length || 0
+      }));
+      io.emit("playersListUpdate", playersList);
     });
 
     // Start game
@@ -119,9 +161,10 @@ module.exports = (io) => {
       startGame(io);
     });
 
-    // Stop game
+    // Stop game (any player can stop the game)
     socket.on("stopGame", () => {
-      console.log("Arrêt de la partie");
+      const playerName = players[socket.id]?.name || `Joueur ${socket.id.substring(0, 8)}`;
+      console.log(`Arrêt de la partie par ${playerName} (${socket.id})`);
       
       // Clear timer
       if (gameState.turnTimer) {
@@ -150,8 +193,8 @@ module.exports = (io) => {
         }
       });
       
-      // Broadcast game stopped
-      io.emit("gameStopped");
+      // Broadcast game stopped with player name
+      io.emit("gameStopped", { reason: "stopped", playerName });
       io.emit("discardPileUpdate", discardPile);
     });
 
@@ -432,6 +475,15 @@ module.exports = (io) => {
         // No players left, stop game
         gameState.gameStarted = false;
       }
+      
+      // Update players list after disconnection
+      const playersList = Object.keys(players).map(playerId => ({
+        id: playerId,
+        name: players[playerId].name || (players[playerId].isBot ? `Bot_${playerId}` : `Joueur ${playerId.substring(0, 8)}`),
+        isBot: players[playerId].isBot || false,
+        handSize: players[playerId].hand?.length || 0
+      }));
+      io.emit("playersListUpdate", playersList);
     });
   });
 };

@@ -106,6 +106,11 @@ function attachSocketListeners() {
     renderHand(hand);
     renderDiscardPile(); // Initialize discard pile display
     console.log('[client] initHand', hand);
+    // Update players list hand size
+    if (playersList && playersList[socket.id]) {
+      playersList[socket.id].handSize = hand.length;
+      updatePlayersTable();
+    }
   });
 
   socket.on("updateHand", (hand) => {
@@ -143,6 +148,11 @@ function attachSocketListeners() {
     });
     
     renderHand(hand);
+    // Update players list hand size
+    if (playersList && playersList[socket.id]) {
+      playersList[socket.id].handSize = hand.length;
+      updatePlayersTable();
+    }
   });
 
   socket.on("playerDiscarded", ({ player, card }) => {
@@ -212,6 +222,7 @@ function attachSocketListeners() {
   });
 
   socket.on('gameInProgress', ({ message, currentPlayer, playerCount }) => {
+    // currentPlayer should be a player name, not an ID
     const fullMessage = `${message} ${playerCount} joueur(s) participent. Tour de ${currentPlayer}.`;
     showToast(fullMessage, 'info', 6000);
     
@@ -222,7 +233,7 @@ function attachSocketListeners() {
     }
   });
 
-  socket.on('turnStart', ({ player }) => {
+  socket.on('turnStart', ({ player, playerName }) => {
     isMyTurn = player === socket.id;
     
     if (turnIndicator) {
@@ -230,8 +241,9 @@ function attachSocketListeners() {
         turnIndicator.textContent = "C'est votre tour!";
         turnIndicator.className = 'my-turn';
       } else {
-        const isBot = player.startsWith('bot_');
-        turnIndicator.textContent = isBot ? "Tour du Bot..." : `Tour de ${player}`;
+        // Use playerName if provided, otherwise fallback to player ID
+        const displayName = playerName || (player.startsWith('bot_') ? `Bot_${player}` : `Joueur ${player.substring(0, 8)}`);
+        turnIndicator.textContent = `Tour de ${displayName}`;
         turnIndicator.className = '';
       }
     }
@@ -314,6 +326,22 @@ function attachSocketListeners() {
         el.textContent = name;
       }
     });
+    
+    // Update players list if player exists
+    if (playersList && playersList[playerId]) {
+      playersList[playerId].name = name;
+      updatePlayersTable();
+    }
+  });
+  
+  socket.on('playersListUpdate', (players) => {
+    console.log('[client] playersListUpdate received:', players);
+    // Update local players list
+    playersList = {};
+    players.forEach(player => {
+      playersList[player.id] = player;
+    });
+    updatePlayersTable();
   });
 
   socket.on('gameStopped', (data) => {
@@ -322,6 +350,8 @@ function attachSocketListeners() {
       message = `La partie a été arrêtée car ${data.playerName || 'un joueur'} a quitté la partie`;
     } else if (data && data.reason === 'timeout') {
       message = `La partie a été arrêtée car ${data.playerName || 'un joueur'} n'a pas joué dans les 60 secondes`;
+    } else if (data && data.reason === 'stopped') {
+      message = `La partie a été arrêtée par ${data.playerName || 'un joueur'}`;
     }
     showToast(message, 'info', 4000);
     
@@ -379,6 +409,13 @@ const handCountSpan = document.getElementById("handCount");
 const welcomeModal = document.getElementById("welcomeModal");
 const playerNameInput = document.getElementById("playerNameInput");
 const enterGameBtn = document.getElementById("enterGameBtn");
+const playersMenuBtn = document.getElementById("playersMenuBtn");
+const playersModal = document.getElementById("playersModal");
+const playersTableBody = document.getElementById("playersTableBody");
+const playersTableBodyMobile = document.getElementById("playersTableBodyMobile");
+
+// Store players list
+let playersList = {};
 
 // Player name (not stored, must be entered each time)
 let playerName = '';
@@ -776,8 +813,8 @@ document.addEventListener('keydown', (ev) => {
       }
       if (isMobile) {
         updateMobileButtons();
-      }
     }
+  }
   }
   // 'z' to commit meld (create a suite with selected cards)
   if (ev.key === 'z' || ev.key === 'Z') {
@@ -985,7 +1022,34 @@ document.addEventListener('DOMContentLoaded', () => {
     if (e.key === 'Escape' && helpModal && helpModal.classList.contains('show')) {
       helpModal.classList.remove('show');
     }
+    if (e.key === 'Escape' && playersModal && playersModal.classList.contains('show')) {
+      playersModal.classList.remove('show');
+    }
   });
+  
+  // Players menu button (mobile)
+  if (playersMenuBtn && playersModal) {
+    playersMenuBtn.onclick = () => {
+      playersModal.classList.add('show');
+    };
+  }
+  
+  // Players modal close button
+  const playersModalClose = document.querySelector('.players-modal-close');
+  if (playersModalClose && playersModal) {
+    playersModalClose.onclick = () => {
+      playersModal.classList.remove('show');
+    };
+  }
+  
+  // Close players modal when clicking outside
+  if (playersModal) {
+    playersModal.onclick = (e) => {
+      if (e.target === playersModal) {
+        playersModal.classList.remove('show');
+      }
+    };
+  }
   
   // Mobile action buttons
   setupMobileActions();
@@ -1188,11 +1252,59 @@ function setupMobileActions() {
   // This will be handled in the turnStart event listener
 }
 
+// Function to update players table
+function updatePlayersTable() {
+  if (!playersTableBody || !playersTableBodyMobile) {
+    console.warn('[updatePlayersTable] Table bodies not found');
+    return;
+  }
+  
+  console.log('[updatePlayersTable] Updating table with players:', playersList);
+  
+  // Clear existing rows
+  playersTableBody.innerHTML = '';
+  playersTableBodyMobile.innerHTML = '';
+  
+  // Add players to both tables
+  const playersArray = Object.values(playersList);
+  if (playersArray.length === 0) {
+    console.warn('[updatePlayersTable] No players in list');
+    return;
+  }
+  
+  playersArray.forEach(player => {
+    const row = document.createElement('tr');
+    const nameCell = document.createElement('td');
+    const typeCell = document.createElement('td');
+    const cardsCell = document.createElement('td');
+    
+    nameCell.className = 'player-name';
+    nameCell.textContent = player.name; // Always use the player's name, not "Vous"
+    
+    typeCell.className = 'player-type';
+    typeCell.textContent = player.isBot ? 'Bot' : 'Joueur';
+    
+    cardsCell.className = 'player-cards';
+    cardsCell.textContent = player.handSize || 0;
+    
+    row.appendChild(nameCell);
+    row.appendChild(typeCell);
+    row.appendChild(cardsCell);
+    
+    playersTableBody.appendChild(row.cloneNode(true));
+    playersTableBodyMobile.appendChild(row);
+  });
+  
+  console.log('[updatePlayersTable] Table updated with', playersArray.length, 'players');
+}
+
 // Debug: Verify all elements are found (also log immediately)
 console.log('[Debug] Elements check (immediate):', {
   handDiv: !!handDiv,
   drawBtn: !!drawBtn,
   startGameBtn: !!startGameBtn,
   socket: !!socket,
-  socketConnected: socket?.connected
+  socketConnected: socket?.connected,
+  playersTableBody: !!playersTableBody,
+  playersTableBodyMobile: !!playersTableBodyMobile
 });

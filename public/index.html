@@ -8,7 +8,45 @@
 </head>
 <body>
   <button id="helpBtn" class="help-btn" title="Aide et règles du jeu">?</button>
+  <button id="playersMenuBtn" class="players-menu-btn" title="Liste des joueurs">☰</button>
   <h1>Jeu de Rami</h1>
+  
+  <!-- Players list table (desktop) -->
+  <div id="playersTableContainer" class="players-table-container">
+    <h3>Joueurs</h3>
+    <table id="playersTable" class="players-table">
+      <thead>
+        <tr>
+          <th>Nom</th>
+          <th>Type</th>
+          <th>Cartes</th>
+        </tr>
+      </thead>
+      <tbody id="playersTableBody">
+        <!-- Players will be added here dynamically -->
+      </tbody>
+    </table>
+  </div>
+  
+  <!-- Players list modal (mobile) -->
+  <div id="playersModal" class="modal">
+    <div class="modal-content players-modal-content">
+      <span class="modal-close players-modal-close">&times;</span>
+      <h2>Joueurs</h2>
+      <table id="playersTableMobile" class="players-table">
+        <thead>
+          <tr>
+            <th>Nom</th>
+            <th>Type</th>
+            <th>Cartes</th>
+          </tr>
+        </thead>
+        <tbody id="playersTableBodyMobile">
+          <!-- Players will be added here dynamically -->
+        </tbody>
+      </table>
+    </div>
+  </div>
   
   <!-- Game controls -->
   <div id="gameControls" style="margin: 20px auto; text-align: center;">

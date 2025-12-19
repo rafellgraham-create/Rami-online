@@ -358,7 +358,7 @@ h1 {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #2196F3;
+  background: #4CAF50;
   color: white;
   border: none;
   font-size: 24px;
@@ -373,9 +373,136 @@ h1 {
 }
 
 .help-btn:hover {
-  background: #1976D2;
+  background: #45a049;
   transform: scale(1.1);
   box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+
+/* Players menu button (mobile) */
+.players-menu-btn {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  width: 40px;
+  height: 40px;
+  border-radius: 8px;
+  background: transparent;
+  color: #ffd966;
+  border: 2px solid #ffd966;
+  font-size: 24px;
+  font-weight: bold;
+  cursor: pointer;
+  z-index: 1000;
+  display: none; /* Hidden on desktop */
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+  transition: all 0.2s;
+  line-height: 1;
+  padding: 0;
+}
+
+.players-menu-btn:hover {
+  background: rgba(255, 217, 102, 0.1);
+  transform: scale(1.1);
+  box-shadow: 0 6px 12px rgba(0,0,0,0.4);
+}
+
+/* Players table container (desktop) */
+.players-table-container {
+  position: fixed;
+  top: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.7);
+  border: 2px solid #4CAF50;
+  border-radius: 10px;
+  padding: 15px;
+  z-index: 100;
+  min-width: 250px;
+  max-width: 300px;
+}
+
+.players-table-container h3 {
+  margin: 0 0 10px 0;
+  color: #ffd966;
+  font-size: 18px;
+  text-align: center;
+}
+
+.players-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.players-table thead {
+  background: rgba(76, 175, 80, 0.3);
+}
+
+.players-table th {
+  padding: 8px;
+  text-align: left;
+  color: #ffd966;
+  border-bottom: 2px solid #4CAF50;
+  font-weight: bold;
+}
+
+.players-table td {
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.players-table tbody tr:hover {
+  background: rgba(76, 175, 80, 0.2);
+}
+
+.players-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.players-table .player-name {
+  color: #fff;
+  font-weight: 500;
+}
+
+.players-table .player-type {
+  color: #999;
+  font-size: 12px;
+}
+
+.players-table .player-cards {
+  color: #4CAF50;
+  font-weight: bold;
+  text-align: center;
+}
+
+/* Players modal (mobile) */
+.players-modal-content {
+  max-width: 90%;
+  max-height: 80vh;
+  overflow-y: auto;
+}
+
+.players-modal-content h2 {
+  margin-top: 0;
+  color: #ffd966;
+  text-align: center;
+}
+
+.players-modal-close {
+  color: #ffd966;
+  float: right;
+  font-size: 32px;
+  font-weight: bold;
+  padding: 10px 20px;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.players-modal-close:hover,
+.players-modal-close:focus {
+  color: #fff;
+  text-decoration: none;
 }
 
 /* Modal */
@@ -723,6 +850,21 @@ h1 {
     font-size: 20px;
     top: 10px;
     right: 10px;
+  }
+  
+  /* Players menu button (mobile) - show on mobile */
+  .players-menu-btn {
+    display: flex;
+    width: 36px;
+    height: 36px;
+    font-size: 20px;
+    top: 10px;
+    left: 10px;
+  }
+  
+  /* Hide players table on mobile */
+  .players-table-container {
+    display: none;
   }
 
   /* Mobile action buttons adjustments */

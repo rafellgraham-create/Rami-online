@@ -349,7 +349,13 @@ function nextTurn(io) {
   gameState.currentPlayer = gameState.playerOrder[gameState.turnIndex];
   gameState.hasDrawn = false;
   
-  io.emit("turnStart", { player: gameState.currentPlayer });
+  // Get player name for turn indicator
+  const currentPlayerName = players[gameState.currentPlayer]?.name || 
+                            (players[gameState.currentPlayer]?.isBot ? 
+                             `Bot_${gameState.currentPlayer}` : 
+                             `Joueur ${gameState.currentPlayer.substring(0, 8)}`);
+  
+  io.emit("turnStart", { player: gameState.currentPlayer, playerName: currentPlayerName });
   
   if (players[gameState.currentPlayer]?.isBot) {
     const bot = bots[gameState.currentPlayer];
@@ -425,7 +431,14 @@ function startGame(io) {
   gameState.hasDrawn = false;
   
   io.emit("gameStarted", { playerOrder: gameState.playerOrder });
-  io.emit("turnStart", { player: gameState.currentPlayer });
+  
+  // Get player name for turn indicator
+  const currentPlayerName = players[gameState.currentPlayer]?.name || 
+                            (players[gameState.currentPlayer]?.isBot ? 
+                             `Bot_${gameState.currentPlayer}` : 
+                             `Joueur ${gameState.currentPlayer.substring(0, 8)}`);
+  
+  io.emit("turnStart", { player: gameState.currentPlayer, playerName: currentPlayerName });
   
   if (players[gameState.currentPlayer]?.isBot) {
     const bot = bots[gameState.currentPlayer];
